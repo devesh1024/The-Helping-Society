@@ -174,12 +174,21 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
 function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
   const { user, isVerified } = useAuth();
   const [replies, setReplies] = useState<Reply[]>([]);
+  const [authors, setAuthors] = useState<Record<string, { full_name: string; email: string }>>({});
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
     const { data } = await supabase.from("community_replies").select("*").eq("post_id", post.id).order("created_at");
-    setReplies((data as Reply[]) ?? []);
+    const list = (data as Reply[]) ?? [];
+    setReplies(list);
+    const ids = Array.from(new Set(list.map((r) => r.author_id)));
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+      const map: any = {};
+      (profs ?? []).forEach((p: any) => { map[p.id] = { full_name: p.full_name, email: p.email }; });
+      setAuthors(map);
+    }
   };
   useEffect(()=>{ load(); /* eslint-disable-next-line */ }, [post.id]);
 
@@ -207,12 +216,22 @@ function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
         <div className="border-t border-border pt-4 mt-2">
           <p className="font-semibold text-sm mb-2 flex items-center gap-2"><MessageCircle className="h-4 w-4"/> Replies ({replies.length})</p>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {replies.map((r)=>(
-              <div key={r.id} className="bg-muted/50 rounded-lg p-3 text-sm">
-                <p>{r.content}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</p>
-              </div>
-            ))}
+            {replies.map((r)=>{
+              const a = authors[r.author_id];
+              const name = a?.full_name || a?.email?.split("@")[0] || "User";
+              return (
+                <div key={r.id} className="bg-muted/50 rounded-lg p-3 text-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="h-6 w-6 rounded-full bg-gradient-primary text-primary-foreground grid place-items-center text-[10px] font-semibold">
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="font-medium text-xs">{name}</span>
+                    <span className="text-[10px] text-muted-foreground">· {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</span>
+                  </div>
+                  <p className="pl-8">{r.content}</p>
+                </div>
+              );
+            })}
           </div>
           {isVerified && (
             <div className="flex gap-2 mt-3">
