@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Briefcase, Calendar, ExternalLink, Loader2, MapPin, Plus, Trash2 } from "lucide-react";
+import { Briefcase, Calendar, Clock, ExternalLink, Loader2, MapPin, Plus, Trash2, GraduationCap, User as UserIcon } from "lucide-react";
 import { format } from "date-fns";
 import { z } from "zod";
 
@@ -18,18 +19,11 @@ interface Opportunity {
   id: string; company: string; role: string; description: string; apply_url: string;
   category: string; type: string; location: string | null; deadline: string | null;
   status: "open" | "closed"; created_at: string; created_by: string;
+  event_at?: string | null; conducted_by?: string | null; mode?: string | null;
 }
 
-const schema = z.object({
-  company: z.string().trim().min(1).max(100),
-  role: z.string().trim().min(1).max(100),
-  description: z.string().trim().min(5).max(2000),
-  apply_url: z.string().trim().url().max(500),
-  category: z.string().trim().min(1).max(40),
-  type: z.string().trim().min(1).max(40),
-  location: z.string().trim().max(80).optional(),
-  deadline: z.string().optional(),
-});
+const TYPE_OPTIONS = ["Part-time", "Full Time", "Remote", "Hybrid"];
+const CATEGORY_OPTIONS = ["Job", "Internship", "Workshop"];
 
 export default function Opportunities() {
   const { isKhabri, isAdmin, user } = useAuth();
@@ -59,7 +53,7 @@ export default function Opportunities() {
             <h1 className="font-display text-3xl md:text-4xl font-bold flex items-center gap-3">
               <Briefcase className="h-8 w-8 text-primary" /> Opportunities
             </h1>
-            <p className="text-muted-foreground mt-1">Curated jobs, internships and contests, posted by Khabri admins.</p>
+            <p className="text-muted-foreground mt-1">Curated jobs, internships and workshops, posted by Khabri admins.</p>
           </div>
           {(isKhabri && isAdmin) && (
             <Button variant="hero" onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Post opportunity</Button>
@@ -72,31 +66,40 @@ export default function Opportunities() {
           <Card className="p-12 text-center text-muted-foreground">No opportunities yet.</Card>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
-            {items.map((o) => (
-              <Card key={o.id} className="p-6 hover:shadow-elegant transition-smooth flex flex-col">
-                <div className="flex justify-between items-start gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-secondary font-medium">{o.category} · {o.type}</p>
-                    <h3 className="font-display font-bold text-xl mt-1">{o.role}</h3>
-                    <p className="text-sm text-muted-foreground">{o.company}</p>
+            {items.map((o) => {
+              const isWorkshop = o.category === "Workshop";
+              return (
+                <Card key={o.id} className="p-6 hover:shadow-elegant transition-smooth flex flex-col">
+                  <div className="flex justify-between items-start gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-secondary font-medium flex items-center gap-1.5">
+                        {isWorkshop && <GraduationCap className="h-3 w-3" />}
+                        {o.category}{!isWorkshop && o.type ? ` · ${o.type}` : ""}
+                      </p>
+                      <h3 className="font-display font-bold text-xl mt-1">{o.role}</h3>
+                      <p className="text-sm text-muted-foreground">{isWorkshop ? (o.conducted_by || o.company) : o.company}</p>
+                    </div>
+                    <Badge variant={o.status === "open" ? "default" : "secondary"}>{o.status}</Badge>
                   </div>
-                  <Badge variant={o.status === "open" ? "default" : "secondary"}>{o.status}</Badge>
-                </div>
-                <p className="text-sm mt-3 line-clamp-3">{o.description}</p>
-                <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground">
-                  {o.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {o.location}</span>}
-                  {o.deadline && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {format(new Date(o.deadline), "PP")}</span>}
-                </div>
-                <div className="flex gap-2 mt-auto pt-4">
-                  <Button asChild variant="hero" size="sm" className="flex-1">
-                    <a href={o.apply_url} target="_blank" rel="noopener noreferrer">Apply <ExternalLink className="h-3.5 w-3.5" /></a>
-                  </Button>
-                  {(isKhabri && isAdmin && o.created_by === user?.id) || isAdmin ? (
-                    <Button variant="outline" size="icon" onClick={() => remove(o.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  ) : null}
-                </div>
-              </Card>
-            ))}
+                  <p className="text-sm mt-3 line-clamp-3">{o.description}</p>
+                  <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground">
+                    {isWorkshop && o.conducted_by && <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" /> {o.conducted_by}</span>}
+                    {isWorkshop && o.event_at && <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(o.event_at), "PPp")}</span>}
+                    {isWorkshop && o.mode && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {o.mode}{o.location ? ` · ${o.location}` : ""}</span>}
+                    {!isWorkshop && o.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {o.location}</span>}
+                    {!isWorkshop && o.deadline && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {format(new Date(o.deadline), "PP")}</span>}
+                  </div>
+                  <div className="flex gap-2 mt-auto pt-4">
+                    <Button asChild variant="hero" size="sm" className="flex-1">
+                      <a href={o.apply_url} target="_blank" rel="noopener noreferrer">{isWorkshop ? "Register" : "Apply"} <ExternalLink className="h-3.5 w-3.5" /></a>
+                    </Button>
+                    {((isKhabri && isAdmin && o.created_by === user?.id) || isAdmin) && (
+                      <Button variant="outline" size="icon" onClick={() => remove(o.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -105,47 +108,129 @@ export default function Opportunities() {
   );
 }
 
+const baseSchema = z.object({
+  description: z.string().trim().min(5).max(2000),
+  apply_url: z.string().trim().url().max(500),
+});
+
 function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (v:boolean)=>void; onCreated: ()=>void }) {
   const { user } = useAuth();
-  const [form, setForm] = useState({ company:"", role:"", description:"", apply_url:"", category:"Internship", type:"Full-time", location:"", deadline:"" });
+  const [category, setCategory] = useState<"Job"|"Internship"|"Workshop">("Internship");
+  const [form, setForm] = useState({
+    company: "", role: "", description: "", apply_url: "",
+    type: "Full Time", location: "", deadline: "",
+    title: "", conducted_by: "", event_at: "", mode: "Online",
+  });
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    const parsed = schema.safeParse(form);
-    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
-    setBusy(true);
-    const { error } = await supabase.from("opportunities").insert({
-      company: parsed.data.company,
-      role: parsed.data.role,
-      description: parsed.data.description,
-      apply_url: parsed.data.apply_url,
-      category: parsed.data.category,
-      type: parsed.data.type,
-      location: parsed.data.location || null,
-      deadline: parsed.data.deadline || null,
+    const base = baseSchema.safeParse({ description: form.description, apply_url: form.apply_url });
+    if (!base.success) { toast.error(base.error.issues[0].message); return; }
+
+    let payload: any = {
+      category,
+      description: base.data.description,
+      apply_url: base.data.apply_url,
       created_by: user!.id,
-    });
+    };
+
+    if (category === "Workshop") {
+      if (!form.title.trim()) { toast.error("Workshop title required"); return; }
+      if (!form.conducted_by.trim()) { toast.error("Conducted by required"); return; }
+      if (!form.event_at) { toast.error("Date & time required"); return; }
+      payload = {
+        ...payload,
+        role: form.title.trim(),
+        company: form.conducted_by.trim(),
+        type: form.mode,
+        conducted_by: form.conducted_by.trim(),
+        event_at: new Date(form.event_at).toISOString(),
+        mode: form.mode,
+        location: form.location || null,
+        deadline: null,
+      };
+    } else {
+      if (!form.company.trim()) { toast.error("Company required"); return; }
+      if (!form.role.trim()) { toast.error("Role required"); return; }
+      payload = {
+        ...payload,
+        company: form.company.trim(),
+        role: form.role.trim(),
+        type: form.type,
+        location: form.location || null,
+        deadline: form.deadline || null,
+      };
+    }
+
+    setBusy(true);
+    const { error } = await supabase.from("opportunities").insert(payload);
     setBusy(false);
-    if (error) toast.error(error.message); else { toast.success("Posted"); onOpenChange(false); onCreated(); }
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Posted"); onOpenChange(false); onCreated();
+      setForm({ company:"", role:"", description:"", apply_url:"", type:"Full Time", location:"", deadline:"", title:"", conducted_by:"", event_at:"", mode:"Online" });
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>New opportunity</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Company</Label><Input value={form.company} onChange={(e)=>setForm({...form,company:e.target.value})}/></div>
-            <div><Label>Role</Label><Input value={form.role} onChange={(e)=>setForm({...form,role:e.target.value})}/></div>
+          <div>
+            <Label>Category</Label>
+            <Select value={category} onValueChange={(v) => setCategory(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
+
+          {category === "Workshop" ? (
+            <>
+              <div><Label>Workshop title</Label><Input value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/></div>
+              <div><Label>Conducted by</Label><Input value={form.conducted_by} onChange={(e)=>setForm({...form,conducted_by:e.target.value})} placeholder="Speaker / Org"/></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Date & time</Label><Input type="datetime-local" value={form.event_at} onChange={(e)=>setForm({...form,event_at:e.target.value})}/></div>
+                <div>
+                  <Label>Mode</Label>
+                  <Select value={form.mode} onValueChange={(v)=>setForm({...form,mode:v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Online">Online</SelectItem>
+                      <SelectItem value="Offline">Offline</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div><Label>Location / Venue (optional)</Label><Input value={form.location} onChange={(e)=>setForm({...form,location:e.target.value})} placeholder={form.mode === "Online" ? "Meeting platform" : "Venue"}/></div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Company</Label><Input value={form.company} onChange={(e)=>setForm({...form,company:e.target.value})}/></div>
+                <div><Label>Role</Label><Input value={form.role} onChange={(e)=>setForm({...form,role:e.target.value})}/></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Type</Label>
+                  <Select value={form.type} onValueChange={(v)=>setForm({...form,type:v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Location</Label><Input value={form.location} onChange={(e)=>setForm({...form,location:e.target.value})}/></div>
+              </div>
+              <div><Label>Deadline</Label><Input type="date" value={form.deadline} onChange={(e)=>setForm({...form,deadline:e.target.value})}/></div>
+            </>
+          )}
+
           <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})}/></div>
-          <div><Label>Apply URL</Label><Input value={form.apply_url} onChange={(e)=>setForm({...form,apply_url:e.target.value})} placeholder="https://..."/></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Category</Label><Input value={form.category} onChange={(e)=>setForm({...form,category:e.target.value})}/></div>
-            <div><Label>Type</Label><Input value={form.type} onChange={(e)=>setForm({...form,type:e.target.value})}/></div>
-            <div><Label>Location</Label><Input value={form.location} onChange={(e)=>setForm({...form,location:e.target.value})}/></div>
-            <div><Label>Deadline</Label><Input type="date" value={form.deadline} onChange={(e)=>setForm({...form,deadline:e.target.value})}/></div>
-          </div>
+          <div><Label>{category === "Workshop" ? "Register link" : "Apply URL"}</Label><Input value={form.apply_url} onChange={(e)=>setForm({...form,apply_url:e.target.value})} placeholder="https://..."/></div>
+
           <Button variant="hero" className="w-full" onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Publish"}</Button>
         </div>
       </DialogContent>
