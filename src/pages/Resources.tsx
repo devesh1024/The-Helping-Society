@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { BookOpen, Eye, Heart, Loader2, Lock, Plus, Search, Trash2, Upload } from "lucide-react";
+import { BookOpen, Eye, Heart, Loader2, Lock, Plus, Search, Trash2, Upload, Download } from "lucide-react";
 import { PdfViewer } from "@/components/PdfViewer";
 import { z } from "zod";
+import { FileDropzone } from "@/components/FileDropzone";
 
 interface Resource {
   id: string; uploader_id: string; title: string; subject: string; description: string | null;
@@ -28,7 +29,6 @@ const resourceSchema = z.object({
   subject: z.string().trim().min(2).max(80),
   description: z.string().trim().max(500).optional(),
   branch: z.string().trim().min(1).max(40),
-  year: z.coerce.number().int().min(1).max(4),
   semester: z.coerce.number().int().min(1).max(8),
 });
 
@@ -98,6 +98,12 @@ export default function Resources() {
     if (!isVerified) { toast.error("Get verified to open files"); return; }
     const { data, error } = await supabase.storage.from("resources").createSignedUrl(r.file_path, 3600);
     if (error || !data) { toast.error("Could not load file"); return; }
+    const isPdf = r.file_name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      // PPT/PPTX — open download in new tab since browsers can't render natively
+      window.open(data.signedUrl, "_blank");
+      return;
+    }
     setSignedUrl(data.signedUrl);
     setViewing(r);
   };
@@ -208,21 +214,31 @@ export default function Resources() {
 }
 
 function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpenChange: (v: boolean) => void; onUploaded: () => void }) {
-  const { user } = useAuth();
-  const [form, setForm] = useState({ title: "", subject: "", description: "", branch: "", year: "1", semester: "1" });
-  const [file, setFile] = useState<File | null>(null);
+  const { user, profile } = useAuth();
+  const [form, setForm] = useState({ title: "", subject: "", description: "", branch: "", semester: "1" });
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
 
+  const ALLOWED = [
+    "application/pdf",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ];
+
   const submit = async () => {
-    if (!user || !file) { toast.error("Please choose a PDF"); return; }
-    if (file.type !== "application/pdf") { toast.error("Only PDF files allowed"); return; }
+    const file = files[0];
+    if (!user || !file) { toast.error("Please choose a PDF or PPT/PPTX"); return; }
+    const ext = file.name.toLowerCase().split(".").pop();
+    if (!ALLOWED.includes(file.type) && !["pdf","ppt","pptx"].includes(ext || "")) {
+      toast.error("Only PDF or PPT/PPTX files allowed"); return;
+    }
     if (file.size > 25 * 1024 * 1024) { toast.error("Max 25MB"); return; }
     const parsed = resourceSchema.safeParse(form);
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     setBusy(true);
     try {
       const path = `${user.id}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, "_")}`;
-      const { error: upErr } = await supabase.storage.from("resources").upload(path, file, { contentType: "application/pdf" });
+      const { error: upErr } = await supabase.storage.from("resources").upload(path, file, { contentType: file.type || "application/octet-stream" });
       if (upErr) throw upErr;
       const { error } = await supabase.from("resources").insert({
         uploader_id: user.id,
@@ -230,7 +246,7 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
         subject: parsed.data.subject,
         description: parsed.data.description || null,
         branch: parsed.data.branch,
-        year: parsed.data.year,
+        year: profile?.year ?? 1,
         semester: parsed.data.semester,
         file_path: path,
         file_name: file.name,
@@ -238,8 +254,8 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
       if (error) throw error;
       toast.success("Submitted for approval");
       onOpenChange(false);
-      setForm({ title: "", subject: "", description: "", branch: "", year: "1", semester: "1" });
-      setFile(null);
+      setForm({ title: "", subject: "", description: "", branch: "", semester: "1" });
+      setFiles([]);
       onUploaded();
     } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
   };
@@ -254,26 +270,17 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
             <div><Label>Subject</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></div>
             <div><Label>Branch</Label><Input value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} placeholder="e.g. CSE" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Year</Label>
-              <Select value={form.year} onValueChange={(v) => setForm({ ...form, year: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{[1,2,3,4].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Semester</Label>
-              <Select value={form.semester} onValueChange={(v) => setForm({ ...form, semester: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{[1,2,3,4,5,6,7,8].map((s) => <SelectItem key={s} value={String(s)}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label>Semester</Label>
+            <Select value={form.semester} onValueChange={(v) => setForm({ ...form, semester: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{[1,2,3,4,5,6,7,8].map((s) => <SelectItem key={s} value={String(s)}>{s}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
           <div><Label>Description (optional)</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
           <div>
-            <Label>PDF file</Label>
-            <Input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <Label>File (PDF or PPT/PPTX — notes accepted)</Label>
+            <FileDropzone accept=".pdf,.ppt,.pptx,application/pdf" files={files} onFiles={setFiles} hint="Drag & drop, click, or paste a file (max 25MB)" />
           </div>
           <Button variant="hero" className="w-full" onClick={submit} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Upload className="h-4 w-4" /> Submit for approval</>}
