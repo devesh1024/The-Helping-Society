@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Heart, Loader2, MessageCircle, Plus, Send, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { z } from "zod";
+import { FileDropzone } from "@/components/FileDropzone";
 
 const cats = [
   { v: "lost_found", label: "Lost & Found" },
@@ -116,7 +117,7 @@ export default function Community() {
 function CreateDialog({ open, onOpenChange, category, onCreated }:
   { open:boolean; onOpenChange:(v:boolean)=>void; category:"lost_found"|"rooms"|"marketplace"; onCreated:()=>void }) {
   const { user } = useAuth();
-  const [form, setForm] = useState({ title:"", content:"", price:"", tags:"" });
+  const [form, setForm] = useState({ title:"", content:"", price:"" });
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -140,12 +141,12 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
         author_id: user!.id, category,
         title: parsed.data.title, content: parsed.data.content,
         price: form.price ? Number(form.price) : null,
-        tags: form.tags ? form.tags.split(",").map(t=>t.trim()).filter(Boolean) : [],
+        tags: [],
         images: paths,
       });
       if (error) throw error;
       toast.success("Posted"); onOpenChange(false); onCreated();
-      setForm({ title:"", content:"", price:"", tags:"" }); setFiles([]);
+      setForm({ title:"", content:"", price:"" }); setFiles([]);
     } catch (e:any) { toast.error(e.message); } finally { setBusy(false); }
   };
 
@@ -156,13 +157,12 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
         <div className="space-y-3">
           <div><Label>Title</Label><Input value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/></div>
           <div><Label>Content</Label><Textarea rows={4} value={form.content} onChange={(e)=>setForm({...form,content:e.target.value})}/></div>
-          <div><Label>Tags (comma separated)</Label><Input value={form.tags} onChange={(e)=>setForm({...form,tags:e.target.value})}/></div>
           {category === "marketplace" && (
             <div><Label>Price (₹)</Label><Input type="number" value={form.price} onChange={(e)=>setForm({...form,price:e.target.value})}/></div>
           )}
           <div>
             <Label>Images {category === "marketplace" && <span className="text-destructive">*</span>}</Label>
-            <Input type="file" accept="image/*" multiple onChange={(e)=>setFiles(Array.from(e.target.files||[]))}/>
+            <FileDropzone accept="image/*" multiple files={files} onFiles={setFiles} hint="Drag & drop, click, or paste images" />
           </div>
           <Button variant="hero" className="w-full" onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Post"}</Button>
         </div>
