@@ -115,7 +115,12 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     setBusy(true);
     const { error } = await supabase.from("opportunities").insert({
-      ...parsed.data,
+      company: parsed.data.company,
+      role: parsed.data.role,
+      description: parsed.data.description,
+      apply_url: parsed.data.apply_url,
+      category: parsed.data.category,
+      type: parsed.data.type,
       location: parsed.data.location || null,
       deadline: parsed.data.deadline || null,
       created_by: user!.id,
