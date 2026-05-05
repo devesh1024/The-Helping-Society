@@ -105,7 +105,7 @@ function UsersPanel() {
             </div>
             {isSuperAdmin && (
               <div className="flex gap-1.5">
-                <Select value={role} onValueChange={(v) => setRole(p.id, v as any, at === "none" ? null : at)}>
+                <Select value={role} onValueChange={(v) => setRole(p.id, v as any, v === "user" ? null : (at === "none" ? null : at))}>
                   <SelectTrigger className="h-8 w-32"><SelectValue/></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">user</SelectItem>
@@ -113,14 +113,16 @@ function UsersPanel() {
                     <SelectItem value="super_admin">super_admin</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={at} onValueChange={(v) => setRole(p.id, role as any, v === "none" ? null : v)}>
-                  <SelectTrigger className="h-8 w-32"><SelectValue/></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">no admin type</SelectItem>
-                    <SelectItem value="khabri">khabri</SelectItem>
-                    <SelectItem value="professor">professor</SelectItem>
-                  </SelectContent>
-                </Select>
+                {(role === "admin" || role === "super_admin") && (
+                  <Select value={at} onValueChange={(v) => setRole(p.id, role as any, v === "none" ? null : v)}>
+                    <SelectTrigger className="h-8 w-36"><SelectValue/></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">no admin type</SelectItem>
+                      <SelectItem value="khabri">khabri</SelectItem>
+                      <SelectItem value="professor">professor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
             <div className="flex gap-1">
