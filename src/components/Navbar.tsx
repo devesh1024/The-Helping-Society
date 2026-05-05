@@ -9,6 +9,7 @@ import {
 import { Bell, BookOpen, Briefcase, Heart, LifeBuoy, LogOut, Menu, Shield, User as UserIcon, X } from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "./NotificationBell";
+import { ThemeToggle } from "./ThemeToggle";
 
 const links = [
   { to: "/resources", label: "Resources", icon: BookOpen },
@@ -64,6 +65,7 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           {user ? (
             <>
               <NotificationBell />
