@@ -147,12 +147,15 @@ export type Database = {
           apply_url: string
           category: string
           company: string
+          conducted_by: string | null
           created_at: string
           created_by: string
           deadline: string | null
           description: string
+          event_at: string | null
           id: string
           location: string | null
+          mode: string | null
           role: string
           status: Database["public"]["Enums"]["opp_status"]
           type: string
@@ -162,12 +165,15 @@ export type Database = {
           apply_url: string
           category: string
           company: string
+          conducted_by?: string | null
           created_at?: string
           created_by: string
           deadline?: string | null
           description: string
+          event_at?: string | null
           id?: string
           location?: string | null
+          mode?: string | null
           role: string
           status?: Database["public"]["Enums"]["opp_status"]
           type: string
@@ -177,12 +183,15 @@ export type Database = {
           apply_url?: string
           category?: string
           company?: string
+          conducted_by?: string | null
           created_at?: string
           created_by?: string
           deadline?: string | null
           description?: string
+          event_at?: string | null
           id?: string
           location?: string | null
+          mode?: string | null
           role?: string
           status?: Database["public"]["Enums"]["opp_status"]
           type?: string
