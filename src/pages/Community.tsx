@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Heart, Loader2, MessageCircle, Plus, Send, Trash2 } from "lucide-react";
@@ -153,7 +153,10 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>New post in {cats.find(c=>c.v===category)?.label}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>New post in {cats.find(c=>c.v===category)?.label}</DialogTitle>
+          <DialogDescription className="sr-only">Create a new community post.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div><Label>Title</Label><Input value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/></div>
           <div><Label>Content</Label><Textarea rows={4} value={form.content} onChange={(e)=>setForm({...form,content:e.target.value})}/></div>
@@ -203,7 +206,10 @@ function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
   return (
     <Dialog open onOpenChange={(o)=>!o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{post.title}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{post.title}</DialogTitle>
+          <DialogDescription className="sr-only">View post details.</DialogDescription>
+        </DialogHeader>
         {post.price != null && <Badge className="bg-secondary text-secondary-foreground w-fit">₹{post.price}</Badge>}
         {post.images?.length > 0 && (
           <div className="grid grid-cols-2 gap-2">

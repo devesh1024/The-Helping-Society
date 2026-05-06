@@ -105,7 +105,17 @@ export default function Profile() {
             </div>
             <div>
               <Label>Branch</Label>
-              <Input value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} placeholder="e.g. CSE" />
+              <Select value={form.branch} onValueChange={(v) => setForm({ ...form, branch: v })}>
+                <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Computer Science Engineering">Computer Science Engineering</SelectItem>
+                  <SelectItem value="Electronics and communication engineering">Electronics and communication engineering</SelectItem>
+                  <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                  <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
+                  <SelectItem value="Mechanical engineering">Mechanical engineering</SelectItem>
+                  <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Year</Label>

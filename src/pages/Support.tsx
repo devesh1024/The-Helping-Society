@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { LifeBuoy, Loader2, MessageCircle, Plus, Send, Siren } from "lucide-react";
@@ -110,6 +110,7 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open:boolean; onOpenC
       description: parsed.data.description,
       urgency: emergency ? "emergency" : "standard",
       anonymous,
+      status: emergency ? "approved" : "pending",
     });
     setBusy(false);
     if (error) toast.error(error.message); else { toast.success("Submitted"); onOpenChange(false); onCreated();
@@ -119,7 +120,10 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open:boolean; onOpenC
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>New support request</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>New support request</DialogTitle>
+          <DialogDescription className="sr-only">Submit a new support request.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div><Label>Subject</Label><Input value={form.subject} onChange={(e)=>setForm({...form,subject:e.target.value})}/></div>
           <div><Label>Describe the issue</Label><Textarea rows={5} value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})}/></div>
@@ -175,7 +179,10 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
   return (
     <Dialog open onOpenChange={(o)=>!o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{showAuthor ? req.subject : "Anonymous request"}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{showAuthor ? req.subject : "Anonymous request"}</DialogTitle>
+          <DialogDescription className="sr-only">Support request details.</DialogDescription>
+        </DialogHeader>
         <div className="flex gap-2 flex-wrap">
           {req.urgency==="emergency" && <Badge className="bg-destructive text-destructive-foreground"><Siren className="h-3 w-3 mr-1"/>Emergency</Badge>}
           <Badge>{req.status}</Badge>

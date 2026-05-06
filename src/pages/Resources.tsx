@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { BookOpen, Eye, Heart, Loader2, Lock, Plus, Search, Trash2, Upload, Download } from "lucide-react";
@@ -263,12 +263,28 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Upload a resource</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Upload a resource</DialogTitle>
+          <DialogDescription className="sr-only">Upload a new resource</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Subject</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></div>
-            <div><Label>Branch</Label><Input value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} placeholder="e.g. CSE" /></div>
+            <div>
+              <Label>Branch</Label>
+              <Select value={form.branch} onValueChange={(v) => setForm({ ...form, branch: v })}>
+                <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Computer Science Engineering">Computer Science Engineering</SelectItem>
+                  <SelectItem value="Electronics and communication engineering">Electronics and communication engineering</SelectItem>
+                  <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                  <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
+                  <SelectItem value="Mechanical engineering">Mechanical engineering</SelectItem>
+                  <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div>
             <Label>Semester</Label>

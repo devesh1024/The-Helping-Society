@@ -1,10 +1,10 @@
-# The Helping Society 🤝
+# The-Helping-SocietyV2 🤝
 
-Welcome to **The Helping Society** – a dedicated community platform designed to connect people, share educational resources, and foster a collaborative environment.
+Welcome to **The-Helping-SocietyV2** – a dedicated community platform designed to connect people, share educational resources, and foster a collaborative environment.
 
 ## 🌟 Overview
 
-The Helping Hub is a modern web application built to streamline resource sharing and community management. Whether you're a student looking for study materials, a professor sharing knowledge, or a community member looking to help out, The Helping Hub provides the infrastructure to make it happen safely and efficiently.
+The-Helping-SocietyV2 is a modern web application built to streamline resource sharing and community management. Whether you're a student looking for study materials, a professor sharing knowledge, or a community member looking to help out, The-Helping-SocietyV2 provides the infrastructure to make it happen safely and efficiently.
 
 ## ✨ Key Features
 
@@ -31,8 +31,8 @@ Ensure you have [Node.js](https://nodejs.org/) and npm installed on your local m
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/devesh1024/The-Helping-SocietyV2.git
-   cd the-helping-society
+   git clone https://github.com/devesh1024/the-helping-society-v2.git
+   cd the-helping-society-v2
    ```
 
 2. **Install dependencies:**
