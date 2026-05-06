@@ -61,29 +61,63 @@ export default function Support() {
         ) : items.length === 0 ? (
           <Card className="p-12 text-center text-muted-foreground">No requests yet.</Card>
         ) : (
-          <div className="space-y-3">
-            {items.map((r) => (
-              <Card key={r.id}
-                onClick={() => setOpenReq(r)}
-                className={`p-5 cursor-pointer hover:shadow-elegant transition-smooth ${r.urgency === "emergency" ? "border-destructive/40 bg-destructive/5" : ""}`}>
-                <div className="flex justify-between items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {r.urgency === "emergency" && <Badge className="bg-destructive text-destructive-foreground"><Siren className="h-3 w-3 mr-1"/> Emergency</Badge>}
-                      <Badge variant={r.status === "resolved" ? "secondary" : r.status === "approved" ? "default" : "outline"}>{r.status}</Badge>
-                      {r.anonymous && (isAdmin || r.author_id === user?.id) && <Badge variant="outline">Anonymous</Badge>}
-                    </div>
-                    <h3 className="font-display font-semibold text-lg mt-2">
-                      {r.anonymous && !isAdmin && r.author_id !== user?.id ? "Anonymous request" : r.subject}
-                    </h3>
-                    {!(r.anonymous && !isAdmin && r.author_id !== user?.id) && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{r.description}</p>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</span>
+          <div className="space-y-8">
+            {items.filter(r => r.urgency === "emergency").length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-xl font-semibold flex items-center gap-2 text-destructive"><Siren className="h-5 w-5"/> Emergency Queue</h2>
+                <div className="flex overflow-x-auto gap-4 pb-4 snap-x">
+                  {items.filter(r => r.urgency === "emergency").map(r => (
+                    <Card key={r.id} onClick={() => setOpenReq(r)}
+                      className="p-5 cursor-pointer hover:shadow-elegant transition-smooth border-destructive/40 bg-destructive/5 min-w-[300px] sm:min-w-[400px] snap-start flex-shrink-0">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className="bg-destructive text-destructive-foreground"><Siren className="h-3 w-3 mr-1"/> Emergency</Badge>
+                            <Badge variant={r.status === "resolved" ? "secondary" : r.status === "approved" ? "default" : "outline"}>{r.status}</Badge>
+                            {r.anonymous && (isAdmin || r.author_id === user?.id) && <Badge variant="outline">Anonymous</Badge>}
+                          </div>
+                          <h3 className="font-display font-semibold text-lg mt-2 line-clamp-1">
+                            {r.anonymous && !isAdmin && r.author_id !== user?.id ? "Anonymous request" : r.subject}
+                          </h3>
+                          {!(r.anonymous && !isAdmin && r.author_id !== user?.id) && (
+                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{r.description}</p>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</span>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              </Card>
-            ))}
+              </div>
+            )}
+
+            {items.filter(r => r.urgency !== "emergency").length > 0 && (
+              <div className="space-y-3">
+                {items.filter(r => r.urgency === "emergency").length > 0 && <h2 className="text-xl font-semibold mb-4 text-foreground/80">Standard Requests</h2>}
+                <div className="space-y-3">
+                  {items.filter(r => r.urgency !== "emergency").map(r => (
+                    <Card key={r.id} onClick={() => setOpenReq(r)}
+                      className="p-5 cursor-pointer hover:shadow-elegant transition-smooth">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={r.status === "resolved" ? "secondary" : r.status === "approved" ? "default" : "outline"}>{r.status}</Badge>
+                            {r.anonymous && (isAdmin || r.author_id === user?.id) && <Badge variant="outline">Anonymous</Badge>}
+                          </div>
+                          <h3 className="font-display font-semibold text-lg mt-2">
+                            {r.anonymous && !isAdmin && r.author_id !== user?.id ? "Anonymous request" : r.subject}
+                          </h3>
+                          {!(r.anonymous && !isAdmin && r.author_id !== user?.id) && (
+                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{r.description}</p>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</span>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
