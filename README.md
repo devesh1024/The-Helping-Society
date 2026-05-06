@@ -1,6 +1,6 @@
-# The Helping Hub 🤝
+# The Helping Society 🤝
 
-Welcome to **The Helping Hub** – a dedicated community platform designed to connect people, share educational resources, and foster a collaborative environment.
+Welcome to **The Helping Society** – a dedicated community platform designed to connect people, share educational resources, and foster a collaborative environment.
 
 ## 🌟 Overview
 
@@ -31,8 +31,8 @@ Ensure you have [Node.js](https://nodejs.org/) and npm installed on your local m
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/devesh1024/the-helping-hub.git
-   cd the-helping-hub
+   git clone https://github.com/devesh1024/The-Helping-SocietyV2.git
+   cd the-helping-society
    ```
 
 2. **Install dependencies:**
