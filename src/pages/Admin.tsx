@@ -209,25 +209,60 @@ function ResourcesPanel() {
 
 function AuditPanel() {
   const [items, setItems] = useState<any[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
+
   useEffect(() => {
-    supabase.from("admin_actions").select("*").order("created_at",{ascending:false}).limit(100)
-      .then(({ data }) => setItems(data ?? []));
+    async function load() {
+      const { data } = await supabase.from("admin_actions").select("*").order("created_at", { ascending: false }).limit(100);
+      if (data) {
+        setItems(data);
+        const uids = new Set<string>();
+        data.forEach(d => {
+          if (d.admin_id) uids.add(d.admin_id);
+          if (d.target_id && d.target_id.includes("-")) uids.add(d.target_id); // Basic UUID check
+        });
+        if (uids.size > 0) {
+          const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", Array.from(uids));
+          if (profs) {
+            const map: Record<string, any> = {};
+            profs.forEach(p => map[p.id] = p);
+            setProfilesMap(map);
+          }
+        }
+      }
+    }
+    load();
   }, []);
+
   return (
-    <div className="space-y-2">
-      {items.map((a) => (
-        <Card key={a.id} className="p-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <FileCheck className="h-4 w-4 text-primary"/>
-            <div>
-              <p className="text-sm font-medium">{a.action_type}</p>
-              <p className="text-xs text-muted-foreground">target: {a.target_id?.slice(0,8) || "—"}</p>
+    <div className="space-y-3">
+      {items.map((a) => {
+        const admin = profilesMap[a.admin_id];
+        const target = profilesMap[a.target_id];
+        
+        const taskPerformed = a.action_type.replace(/_/g, " ");
+        const targetStr = target ? (target.email || target.full_name) : (a.target_id?.slice(0, 8) || "—");
+        const adminStr = admin ? (admin.full_name || admin.email) : "Unknown Admin";
+
+        return (
+          <Card key={a.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <FileCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold capitalize">{taskPerformed}</p>
+                <div className="text-xs text-muted-foreground flex flex-col gap-0.5">
+                  <span><strong className="font-medium text-foreground">Target:</strong> {targetStr}</span>
+                  <span><strong className="font-medium text-foreground">By Admin:</strong> {adminStr}</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(a.created_at),{addSuffix:true})}</span>
-        </Card>
-      ))}
-      {items.length===0 && <Card className="p-8 text-center text-muted-foreground">No actions logged.</Card>}
+            <span className="text-xs text-muted-foreground whitespace-nowrap bg-secondary/50 px-2 py-1 rounded-md self-start md:self-auto">
+              {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
+            </span>
+          </Card>
+        );
+      })}
+      {items.length === 0 && <Card className="p-8 text-center text-muted-foreground">No actions logged.</Card>}
     </div>
   );
 }
