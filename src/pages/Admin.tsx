@@ -57,18 +57,28 @@ function UsersPanel() {
     await supabase.from("admin_actions").insert({ admin_id: user!.id, action_type, target_id, details });
   };
 
+  const canModify = (targetId: string) => {
+    if (targetId === user?.id) return false;
+    if (isSuperAdmin) return true;
+    const targetRoles = roles[targetId] || [];
+    const targetRole = targetRoles[0]?.role || "user";
+    return targetRole !== "admin" && targetRole !== "super_admin";
+  };
+
   const setVerified = async (id: string, v: boolean) => {
+    if (!canModify(id)) { toast.error("Unauthorized action."); return; }
     await supabase.from("profiles").update({ verified: v }).eq("id", id);
     await log(v ? "verify_user" : "unverify_user", id);
     toast.success("Updated"); load();
   };
   const setDisabled = async (id: string, v: boolean) => {
+    if (!canModify(id)) { toast.error("Unauthorized action."); return; }
     await supabase.from("profiles").update({ is_disabled: v }).eq("id", id);
     await log(v ? "disable_user" : "enable_user", id);
     toast.success("Updated"); load();
   };
   const setBanned = async (id: string, v: boolean) => {
-    if (!isSuperAdmin) { toast.error("Super admin only"); return; }
+    if (!isSuperAdmin || id === user?.id) { toast.error("Unauthorized action."); return; }
     await supabase.from("profiles").update({ is_banned: v }).eq("id", id);
     await log(v ? "ban_user" : "unban_user", id);
     toast.success("Updated"); load();
@@ -126,13 +136,17 @@ function UsersPanel() {
               </div>
             )}
             <div className="flex gap-1">
-              <Button size="sm" variant="outline" onClick={() => setVerified(p.id, !p.verified)}>
-                {p.verified ? "Unverify" : "Verify"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setDisabled(p.id, !p.is_disabled)}>
-                {p.is_disabled ? "Enable" : "Disable"}
-              </Button>
-              {isSuperAdmin && (
+              {p.id !== user?.id && (isSuperAdmin || (role !== "admin" && role !== "super_admin")) && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setVerified(p.id, !p.verified)}>
+                    {p.verified ? "Unverify" : "Verify"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setDisabled(p.id, !p.is_disabled)}>
+                    {p.is_disabled ? "Enable" : "Disable"}
+                  </Button>
+                </>
+              )}
+              {isSuperAdmin && p.id !== user?.id && (
                 <Button size="sm" variant="destructive" onClick={() => setBanned(p.id, !p.is_banned)}>
                   <Ban className="h-3 w-3"/> {p.is_banned ? "Unban" : "Ban"}
                 </Button>
