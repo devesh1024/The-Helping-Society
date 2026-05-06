@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Logo } from "./Logo";
 
 export function Footer() {
@@ -15,11 +16,11 @@ export function Footer() {
         </div>
         <div>
           <p className="font-semibold text-sm mb-2">Modules</p>
-          <ul className="text-sm text-muted-foreground space-y-1.5">
-            <li>Resource Hub</li>
-            <li>Opportunities</li>
-            <li>Community</li>
-            <li>Support</li>
+          <ul className="text-sm text-muted-foreground space-y-1.5 flex flex-col">
+            <li><Link to="/resources" className="hover:text-primary transition-smooth">Resource Hub</Link></li>
+            <li><Link to="/opportunities" className="hover:text-primary transition-smooth">Opportunities</Link></li>
+            <li><Link to="/community" className="hover:text-primary transition-smooth">Community</Link></li>
+            <li><Link to="/support" className="hover:text-primary transition-smooth">Support</Link></li>
           </ul>
         </div>
         <div>
