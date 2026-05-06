@@ -72,7 +72,7 @@ export default function Profile() {
             <p className="text-sm text-muted-foreground mt-1">
               {isVerified
                 ? "You have full access to upload, comment, like and create posts."
-                : <>Sign up with an <span className="text-primary font-medium">@uecu.ac.in</span> email to get instant verification, or wait for admin approval.</>}
+                : "Please wait for admin approval to get full access."}
             </p>
           </div>
           {isVerified && <Badge className="bg-primary text-primary-foreground">Verified</Badge>}

@@ -114,11 +114,7 @@ export default function Auth() {
             <div>
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="you@uecu.ac.in" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              {mode === "signup" && (
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Use your <span className="text-primary font-medium">@uecu.ac.in</span> email to get verified instantly.
-                </p>
-              )}
+
             </div>
             <div>
               <Label htmlFor="password">Password</Label>
