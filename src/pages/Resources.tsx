@@ -39,6 +39,7 @@ export default function Resources() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [semester, setSemester] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<string>("recent");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
@@ -61,9 +62,14 @@ export default function Resources() {
       .from("resources")
       .select("*", { count: "exact" })
       .eq("status", "approved")
-      .in("year", accessibleYears)
-      .order("created_at", { ascending: false })
-      .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+      .in("year", accessibleYears);
+      
+    if (sortOrder === "recent") q = q.order("created_at", { ascending: false });
+    else if (sortOrder === "oldest") q = q.order("created_at", { ascending: true });
+    else if (sortOrder === "most_likes") q = q.order("like_count", { ascending: false });
+    else if (sortOrder === "least_likes") q = q.order("like_count", { ascending: true });
+    
+    q = q.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
     if (semester !== "all") q = q.eq("semester", Number(semester));
     if (debounced) q = q.or(`title.ilike.%${debounced}%,subject.ilike.%${debounced}%`);
     const { data, count } = await q;
@@ -78,7 +84,7 @@ export default function Resources() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [debounced, semester, page, accessibleYears.join(",")]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [debounced, semester, sortOrder, page, accessibleYears.join(",")]);
 
   const toggleLike = async (r: Resource) => {
     if (!user || !isVerified) { toast.error("Verified users only"); return; }
@@ -135,6 +141,15 @@ export default function Resources() {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="Search title or subject…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} />
           </div>
+          <Select value={sortOrder} onValueChange={(v) => { setSortOrder(v); setPage(0); }}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Sort by" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Recently Uploaded</SelectItem>
+              <SelectItem value="oldest">Oldest Uploaded</SelectItem>
+              <SelectItem value="most_likes">Most Likes</SelectItem>
+              <SelectItem value="least_likes">Least Likes</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={semester} onValueChange={(v) => { setSemester(v); setPage(0); }}>
             <SelectTrigger className="w-40"><SelectValue placeholder="Semester" /></SelectTrigger>
             <SelectContent>

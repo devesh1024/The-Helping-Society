@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isVerified: !!profile?.verified && !profile?.is_disabled && !profile?.is_banned,
     isAdmin: roles.includes("admin") || roles.includes("super_admin"),
     isSuperAdmin: roles.includes("super_admin"),
-    isKhabri: adminType === "khabri",
+    isKhabri: adminType === "khabri" || roles.includes("super_admin"),
     signOut,
     refresh,
   };
