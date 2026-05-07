@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Briefcase, Calendar, Clock, ExternalLink, Loader2, MapPin, Plus, Trash2, GraduationCap, User as UserIcon } from "lucide-react";
@@ -175,7 +175,10 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New opportunity</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>New opportunity</DialogTitle>
+          <DialogDescription className="sr-only">Fill in the details to post a new opportunity.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Category</Label>

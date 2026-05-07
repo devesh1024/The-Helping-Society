@@ -21,7 +21,7 @@ export function NotificationBell() {
     const { data } = await supabase
       .from("notifications")
       .select("*")
-      .eq("user_id", user.id)
+      .or(`user_id.eq.${user.id},user_id.is.null`)
       .order("created_at", { ascending: false })
       .limit(20);
     setItems((data as Notification[]) ?? []);
@@ -33,7 +33,7 @@ export function NotificationBell() {
     if (!user) return;
     const channel = supabase
       .channel("notifications-bell")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, load)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);

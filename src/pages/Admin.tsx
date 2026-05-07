@@ -8,8 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Ban, Check, FileCheck, Loader2, ShieldCheck, Trash2, X } from "lucide-react";
+import { Ban, Check, Eye, FileCheck, Loader2, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PdfViewer } from "@/components/PdfViewer";
+import { createNotification } from "@/utils/notifications";
+import { Input } from "@/components/ui/input";
 
 export default function Admin() {
   return (
@@ -40,6 +44,7 @@ function UsersPanel() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [roles, setRoles] = useState<Record<string, { role: string; admin_type: string | null }[]>>({});
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -93,11 +98,27 @@ function UsersPanel() {
     toast.success("Role updated"); load();
   };
 
+  // Optimized search using filter (efficient for the current user count)
+  const filteredProfiles = profiles.filter(p => 
+    p.full_name?.toLowerCase().includes(search.toLowerCase()) || 
+    p.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
   if (loading) return <div className="py-10 grid place-items-center"><Loader2 className="animate-spin"/></div>;
 
   return (
-    <div className="space-y-3">
-      {profiles.map((p) => {
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input 
+          className="pl-9" 
+          placeholder="Search users by name or email..." 
+          value={search} 
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="space-y-3">
+        {filteredProfiles.map((p) => {
         const userRoles = roles[p.id] || [];
         const role = userRoles[0]?.role || "user";
         const at = userRoles[0]?.admin_type || "none";
@@ -138,9 +159,11 @@ function UsersPanel() {
             <div className="flex gap-1">
               {p.id !== user?.id && (isSuperAdmin || (role !== "admin" && role !== "super_admin")) && (
                 <>
-                  <Button size="sm" variant="outline" onClick={() => setVerified(p.id, !p.verified)}>
-                    {p.verified ? "Unverify" : "Verify"}
-                  </Button>
+                  {!p.verified && (
+                    <Button size="sm" variant="outline" onClick={() => setVerified(p.id, true)}>
+                      Verify
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => setDisabled(p.id, !p.is_disabled)}>
                     {p.is_disabled ? "Enable" : "Disable"}
                   </Button>
@@ -155,6 +178,7 @@ function UsersPanel() {
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -164,6 +188,7 @@ function ResourcesPanel() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("pending");
+  const [preview, setPreview] = useState<any>(null);
 
   const load = async () => {
     setLoading(true);
@@ -178,9 +203,19 @@ function ResourcesPanel() {
     await supabase.from("admin_actions").insert({ admin_id: user!.id, action_type: a, target_id: t });
   };
 
-  const setStatus = async (id: string, status: "approved"|"rejected") => {
-    const { error } = await supabase.from("resources").update({ status }).eq("id", id);
-    if (error) toast.error(error.message); else { await log("resource_"+status, id); toast.success("Updated"); load(); }
+  const setStatus = async (it: any, status: "approved"|"rejected") => {
+    const { error } = await supabase.from("resources").update({ status }).eq("id", it.id);
+    if (error) toast.error(error.message); 
+    else { 
+      await log("resource_"+status, it.id); 
+      await createNotification({
+        user_id: it.uploader_id,
+        title: `Resource ${status === "approved" ? "Approved" : "Rejected"}`,
+        body: `Your resource "${it.title}" has been ${status}.`,
+        link: "/resources"
+      });
+      toast.success("Updated"); load(); 
+    }
   };
   const remove = async (it: any) => {
     if (!confirm("Delete?")) return;
@@ -207,9 +242,12 @@ function ResourcesPanel() {
               </div>
               <Badge variant={r.status==="approved"?"default":r.status==="rejected"?"destructive":"outline"}>{r.status}</Badge>
               <div className="flex gap-1">
+                <Button size="sm" variant="outline" onClick={() => setPreview(r)} title="Preview">
+                  <Eye className="h-3 w-3"/>
+                </Button>
                 {r.status === "pending" && <>
-                  <Button size="sm" variant="hero" onClick={()=>setStatus(r.id,"approved")}><Check className="h-3 w-3"/></Button>
-                  <Button size="sm" variant="outline" onClick={()=>setStatus(r.id,"rejected")}><X className="h-3 w-3"/></Button>
+                  <Button size="sm" variant="hero" onClick={()=>setStatus(r,"approved")}><Check className="h-3 w-3"/></Button>
+                  <Button size="sm" variant="outline" onClick={()=>setStatus(r,"rejected")}><X className="h-3 w-3"/></Button>
                 </>}
                 <Button size="sm" variant="destructive" onClick={()=>remove(r)}><Trash2 className="h-3 w-3"/></Button>
               </div>
@@ -217,6 +255,28 @@ function ResourcesPanel() {
           ))}
           {items.length===0 && <Card className="p-8 text-center text-muted-foreground">Nothing here.</Card>}
         </div>}
+
+      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+        <DialogContent className="max-w-4xl h-[90vh] p-0 flex flex-col overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>Preview: {preview?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 bg-muted/20">
+            {preview && (
+              <PdfViewer url={supabase.storage.from("resources").getPublicUrl(preview.file_path).data.publicUrl} />
+            )}
+          </div>
+          <div className="p-4 border-t flex justify-end gap-2 bg-background">
+            {preview?.status === "pending" && (
+              <>
+                <Button variant="hero" onClick={() => { setStatus(preview, "approved"); setPreview(null); }}>Approve</Button>
+                <Button variant="outline" onClick={() => { setStatus(preview, "rejected"); setPreview(null); }}>Reject</Button>
+              </>
+            )}
+            <Button variant="ghost" onClick={() => setPreview(null)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

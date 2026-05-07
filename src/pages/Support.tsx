@@ -11,9 +11,10 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { LifeBuoy, Loader2, MessageCircle, Plus, Send, Siren } from "lucide-react";
+import { LifeBuoy, Loader2, Lock, MessageCircle, Plus, Send, Siren } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { z } from "zod";
+import { notifyAdmins, createNotification } from "@/utils/notifications";
 
 interface Req {
   id: string; author_id: string; subject: string; description: string;
@@ -36,10 +37,17 @@ export default function Support() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("support_requests").select("*").order("created_at", { ascending: false });
+    let q = supabase.from("support_requests").select("*");
+    
+    // For non-admins, only show approved posts or emergency posts
+    if (!isAdmin) {
+      q = q.or('status.eq.approved,urgency.eq.emergency');
+    }
+    
+    const { data } = await q.order("created_at", { ascending: false });
     setItems((data as Req[]) ?? []); setLoading(false);
   };
-  useEffect(()=>{ load(); }, []);
+  useEffect(()=>{ load(); }, [isAdmin]);
 
   return (
     <Layout>
@@ -56,6 +64,13 @@ export default function Support() {
           </Button>
         </div>
 
+        {!isVerified && (
+          <Card className="p-4 mb-6 border-secondary/40 bg-secondary/5 flex items-center gap-3 text-sm">
+            <Lock className="h-4 w-4 text-secondary" />
+            You can see the list, but you'll need to <a href="/profile" className="underline font-medium">get verified</a> to see full descriptions and join discussions.
+          </Card>
+        )}
+
         {loading ? (
           <div className="space-y-3">{Array.from({length:4}).map((_,i)=><Card key={i} className="h-24 animate-pulse bg-muted/40"/>)}</div>
         ) : items.length === 0 ? (
@@ -67,7 +82,7 @@ export default function Support() {
                 <h2 className="text-xl font-semibold flex items-center gap-2 text-destructive"><Siren className="h-5 w-5"/> Emergency Queue</h2>
                 <div className="flex overflow-x-auto gap-4 pb-4 snap-x">
                   {items.filter(r => r.urgency === "emergency").map(r => (
-                    <Card key={r.id} onClick={() => setOpenReq(r)}
+                    <Card key={r.id} onClick={() => isVerified ? setOpenReq(r) : toast.error("Get verified to see details")}
                       className="p-5 cursor-pointer hover:shadow-elegant transition-smooth border-destructive/40 bg-destructive/5 min-w-[300px] sm:min-w-[400px] snap-start flex-shrink-0">
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex-1 min-w-0">
@@ -96,7 +111,7 @@ export default function Support() {
                 {items.filter(r => r.urgency === "emergency").length > 0 && <h2 className="text-xl font-semibold mb-4 text-foreground/80">Standard Requests</h2>}
                 <div className="space-y-3">
                   {items.filter(r => r.urgency !== "emergency").map(r => (
-                    <Card key={r.id} onClick={() => setOpenReq(r)}
+                    <Card key={r.id} onClick={() => isVerified ? setOpenReq(r) : toast.error("Get verified to see details")}
                       className="p-5 cursor-pointer hover:shadow-elegant transition-smooth">
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex-1 min-w-0">
@@ -138,17 +153,37 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open:boolean; onOpenC
     const parsed = schema.safeParse(form);
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     setBusy(true);
-    const { error } = await supabase.from("support_requests").insert({
-      author_id: user!.id,
-      subject: parsed.data.subject,
-      description: parsed.data.description,
-      urgency: emergency ? "emergency" : "standard",
-      anonymous,
-      status: emergency ? "approved" : "pending",
-    });
-    setBusy(false);
-    if (error) toast.error(error.message); else { toast.success("Submitted"); onOpenChange(false); onCreated();
-      setForm({ subject:"", description:"" }); setEmergency(false); setAnonymous(false); }
+    try {
+      const { error } = await supabase.from("support_requests").insert({
+        author_id: user!.id,
+        subject: parsed.data.subject,
+        description: parsed.data.description,
+        urgency: emergency ? "emergency" : "standard",
+        anonymous,
+        status: emergency ? "approved" : "pending",
+      });
+      if (error) throw error;
+
+      if (emergency) {
+        await createNotification({
+          user_id: null,
+          title: "New Support Emergency",
+          body: `Something new in Support: ${parsed.data.subject}`,
+          link: "/support"
+        });
+      } else {
+        await notifyAdmins(
+          "Support Request Needs Approval",
+          `A new support request "${parsed.data.subject}" needs your approval.`,
+          "/support"
+        );
+      }
+
+      toast.success("Request submitted");
+      onOpenChange(false);
+      setForm({ subject:"", description:"" }); setEmergency(false); setAnonymous(false);
+      onCreated();
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
   };
 
   return (
@@ -202,12 +237,32 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
     setBusy(true);
     const { error } = await supabase.from("support_replies").insert({ request_id: req.id, author_id: user!.id, message: text.trim() });
     setBusy(false);
-    if (error) toast.error(error.message); else { setText(""); load(); }
+    if (error) toast.error(error.message); 
+    else { 
+      if (user!.id !== req.author_id) {
+        await createNotification({
+          user_id: req.author_id,
+          title: "New Reply on Support Request",
+          body: `${user!.id === req.author_id ? "You" : "Someone"} replied to your request: ${text.trim()}`,
+          link: "/support"
+        });
+      }
+      setText(""); load(); 
+    }
   };
 
   const setStatus = async (status: "approved"|"resolved") => {
     const { error } = await supabase.from("support_requests").update({ status }).eq("id", req.id);
-    if (error) toast.error(error.message); else { toast.success("Updated"); onClose(); }
+    if (error) toast.error(error.message); 
+    else { 
+      await createNotification({
+        user_id: req.author_id,
+        title: `Support Request ${status === "approved" ? "Approved" : "Resolved"}`,
+        body: `Your request "${req.subject}" has been marked as ${status}.`,
+        link: "/support"
+      });
+      toast.success("Updated"); onClose(); 
+    }
   };
 
   return (

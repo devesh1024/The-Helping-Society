@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { BookOpen, Eye, Heart, Loader2, Lock, Plus, Search, Trash2, Upload, Download } from "lucide-react";
 import { PdfViewer } from "@/components/PdfViewer";
+import { notifyAdmins, createNotification } from "@/utils/notifications";
 import { z } from "zod";
 import { FileDropzone } from "@/components/FileDropzone";
 
@@ -97,6 +98,14 @@ export default function Resources() {
     } else {
       const { error } = await supabase.from("resource_likes").insert({ user_id: user.id, resource_id: r.id });
       if (error) { load(); toast.error(error.message); }
+      else if (user.id !== r.uploader_id) {
+        await createNotification({
+          user_id: r.uploader_id,
+          title: "New Like on Resource",
+          body: `Someone liked your resource: ${r.title}`,
+          link: "/resources"
+        });
+      }
     }
   };
 
@@ -267,6 +276,13 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
         file_name: file.name,
       });
       if (error) throw error;
+      
+      await notifyAdmins(
+        "Resource Approval Needed",
+        `A new resource "${parsed.data.title}" has been uploaded and needs approval.`,
+        "/admin"
+      );
+
       toast.success("Submitted for approval");
       onOpenChange(false);
       setForm({ title: "", subject: "", description: "", branch: "", semester: "1" });

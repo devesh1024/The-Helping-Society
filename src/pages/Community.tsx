@@ -12,10 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Heart, Loader2, MessageCircle, Plus, Send, Trash2 } from "lucide-react";
+import { Heart, Loader2, Lock, MessageCircle, Plus, Send, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { z } from "zod";
 import { FileDropzone } from "@/components/FileDropzone";
+import { createNotification } from "@/utils/notifications";
 
 const cats = [
   { v: "lost_found", label: "Lost & Found" },
@@ -79,6 +80,13 @@ export default function Community() {
           </TabsList>
         </Tabs>
 
+        {!isVerified && (
+          <Card className="p-4 mb-6 border-secondary/40 bg-secondary/5 flex items-center gap-3 text-sm">
+            <Lock className="h-4 w-4 text-secondary" />
+            You can browse listings, but you'll need to <a href="/profile" className="underline font-medium">get verified</a> to see full details and contact information.
+          </Card>
+        )}
+
         {loading ? (
           <div className="grid md:grid-cols-2 gap-4">{Array.from({length:4}).map((_,i)=><Card key={i} className="h-40 animate-pulse bg-muted/40"/>)}</div>
         ) : posts.length === 0 ? (
@@ -86,7 +94,8 @@ export default function Community() {
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
             {posts.map((p) => (
-              <Card key={p.id} className="p-5 hover:shadow-elegant transition-smooth cursor-pointer" onClick={() => setOpenPost(p)}>
+              <Card key={p.id} className="p-5 hover:shadow-elegant transition-smooth cursor-pointer" 
+                onClick={() => isVerified ? setOpenPost(p) : toast.error("Get verified to see details")}>
                 {p.images?.[0] && (
                   <img src={supabase.storage.from("community-images").getPublicUrl(p.images[0]).data.publicUrl}
                        alt="" className="rounded-lg w-full h-44 object-cover mb-3" />
@@ -158,6 +167,12 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
          toast.error("Please fill all required marketplace fields"); return;
       }
     }
+
+    if ((category === "rooms" || category === "marketplace") && form.contact_number) {
+      if (!/^\d{10}$/.test(form.contact_number.replace(/\s/g, ""))) {
+        toast.error("Contact number must be exactly 10 digits"); return;
+      }
+    }
     
     if (files.length === 0) { toast.error("At least one image/video required"); return; }
     if (files.some(f => f.size > 50 * 1024 * 1024)) {
@@ -182,7 +197,16 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
         images: paths,
       });
       if (error) throw error;
-      toast.success("Posted"); onOpenChange(false); onCreated();
+      
+      const categoryLabel = cats.find(c => c.v === category)?.label || category;
+      await createNotification({
+        user_id: null,
+        title: `New Post in ${categoryLabel}`,
+        body: `Something new in ${categoryLabel}: ${actualTitle}`,
+        link: "/community"
+      });
+
+      toast.success("Post created"); onOpenChange(false); onCreated();
       setForm({ title:"", content:"", price:"", room_type:"", room_type_other:"", allowed_for:"", contact_number:"", rent:"", location:"", furnishing:"", time_used:"" }); 
       setFiles([]);
     } catch (e:any) { toast.error(e.message); } finally { setBusy(false); }
@@ -297,7 +321,18 @@ function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
     setBusy(true);
     const { error } = await supabase.from("community_replies").insert({ post_id: post.id, author_id: user!.id, content: text.trim() });
     setBusy(false);
-    if (error) toast.error(error.message); else { setText(""); load(); }
+    if (error) toast.error(error.message); 
+    else { 
+      if (user!.id !== post.author_id) {
+        await createNotification({
+          user_id: post.author_id,
+          title: "New Reply on Your Post",
+          body: `Someone replied to your post: ${post.title}`,
+          link: "/community"
+        });
+      }
+      setText(""); load(); 
+    }
   };
 
   return (

@@ -16,7 +16,7 @@ const schema = z.object({
   full_name: z.string().trim().min(2).max(100),
   mobile_number: z.string().trim().max(20).optional().or(z.literal("")),
   branch: z.string().trim().max(80).optional().or(z.literal("")),
-  year: z.coerce.number().int().min(1).max(4).optional().or(z.literal("" as any)),
+  year: z.coerce.number().int().min(1).max(2100).optional().or(z.literal("" as any)),
 });
 
 export default function Profile() {
@@ -94,7 +94,9 @@ export default function Profile() {
             </div>
             <div>
               <Label>User type</Label>
-              <Select value={form.user_type} onValueChange={(v) => setForm({ ...form, user_type: v })}>
+              <Select value={form.user_type} onValueChange={(v) => {
+                setForm({ ...form, user_type: v, year: v === "faculty" ? "" as any : form.year });
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="student">Student</SelectItem>
@@ -117,15 +119,21 @@ export default function Profile() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Year</Label>
-              <Select value={String(form.year || "")} onValueChange={(v) => setForm({ ...form, year: v as any })}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>
-                  {[1,2,3,4].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {form.user_type !== "faculty" && (
+              <div>
+                <Label>{form.user_type === "alumni" ? "Passout Year" : "Year"}</Label>
+                {form.user_type === "student" ? (
+                  <Select value={String(form.year || "")} onValueChange={(v) => setForm({ ...form, year: v as any })}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {[1,2,3,4].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input type="number" placeholder="e.g. 2024" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
+                )}
+              </div>
+            )}
           </div>
           <Button variant="hero" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}</Button>
         </Card>
