@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "shx cp -r node_modules/@pdftron/webviewer/public/* public/webviewer/"
+    "postinstall": "shx mkdir -p public/webviewer && shx cp -r node_modules/@pdftron/webviewer/public/. public/webviewer"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
