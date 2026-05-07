@@ -24,4 +24,7 @@ dist-ssr
 *.sw?
 .env
 public/webviewer
+.agents/
+skills-lock.json
+npm_install_log.txt
 
