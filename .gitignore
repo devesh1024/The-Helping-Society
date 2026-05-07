@@ -28,3 +28,7 @@ public/webviewer
 skills-lock.json
 npm_install_log.txt
 
+*.map
+dist/
+build/
+.agent/
