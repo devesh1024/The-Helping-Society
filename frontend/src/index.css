@@ -1,0 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 30% 98%;
+    --foreground: 187 40% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 187 40% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 187 40% 12%;
+
+    --primary: 186 62% 28%;             /* #1A6B72 deep teal */
+    --primary-foreground: 40 50% 98%;
+    --primary-glow: 186 55% 42%;
+
+    --secondary: 25 79% 54%;            /* #E8892B warm orange */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-glow: 32 90% 60%;
+
+    --muted: 186 20% 94%;
+    --muted-foreground: 186 15% 38%;
+
+    --accent: 25 79% 54%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 60% 36%;
+    --warning: 38 92% 50%;
+
+    --border: 186 20% 88%;
+    --input: 186 20% 90%;
+    --ring: 186 62% 28%;
+
+    --radius: 0.85rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(186 62% 28%), hsl(186 55% 42%));
+    --gradient-accent: linear-gradient(135deg, hsl(25 79% 54%), hsl(32 90% 60%));
+    --gradient-hero: radial-gradient(ellipse at top left, hsl(186 62% 28% / 0.15), transparent 60%),
+                     radial-gradient(ellipse at bottom right, hsl(25 79% 54% / 0.12), transparent 55%);
+
+    --shadow-elegant: 0 10px 40px -12px hsl(186 62% 28% / 0.25);
+    --shadow-glow: 0 0 50px -10px hsl(186 55% 42% / 0.45);
+    --shadow-soft: 0 2px 8px hsl(186 30% 20% / 0.06), 0 8px 24px hsl(186 30% 20% / 0.04);
+
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 186 30% 96%;
+    --sidebar-foreground: 187 40% 18%;
+    --sidebar-primary: 186 62% 28%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 186 25% 90%;
+    --sidebar-accent-foreground: 187 40% 18%;
+    --sidebar-border: 186 20% 85%;
+    --sidebar-ring: 186 62% 28%;
+  }
+
+  .dark {
+    --background: 195 35% 7%;
+    --foreground: 180 25% 92%;
+
+    --card: 195 32% 10%;
+    --card-foreground: 180 25% 92%;
+
+    --popover: 195 32% 10%;
+    --popover-foreground: 180 25% 92%;
+
+    --primary: 186 70% 50%;
+    --primary-foreground: 195 40% 8%;
+    --primary-glow: 186 80% 60%;
+
+    --secondary: 25 85% 58%;
+    --secondary-foreground: 195 40% 8%;
+
+    --muted: 195 25% 16%;
+    --muted-foreground: 186 15% 65%;
+
+    --accent: 25 85% 58%;
+    --accent-foreground: 195 40% 8%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 195 25% 18%;
+    --input: 195 25% 18%;
+    --ring: 186 70% 50%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(186 70% 30%), hsl(186 80% 50%));
+    --gradient-accent: linear-gradient(135deg, hsl(25 85% 50%), hsl(32 90% 60%));
+    --gradient-hero: radial-gradient(ellipse at top left, hsl(186 70% 35% / 0.25), transparent 60%),
+                     radial-gradient(ellipse at bottom right, hsl(25 85% 50% / 0.18), transparent 55%);
+
+    --shadow-elegant: 0 10px 40px -12px hsl(186 80% 40% / 0.4);
+    --shadow-glow: 0 0 60px -10px hsl(186 80% 60% / 0.5);
+    --shadow-soft: 0 2px 8px hsl(0 0% 0% / 0.4);
+
+    --sidebar-background: 195 35% 9%;
+    --sidebar-foreground: 180 20% 88%;
+    --sidebar-primary: 186 70% 50%;
+    --sidebar-primary-foreground: 195 40% 8%;
+    --sidebar-accent: 195 28% 14%;
+    --sidebar-accent-foreground: 180 20% 88%;
+    --sidebar-border: 195 25% 18%;
+    --sidebar-ring: 186 70% 50%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { font-family: 'Inter', system-ui, sans-serif; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  h1, h2, h3, h4, h5 { font-family: 'Plus Jakarta Sans', sans-serif; @apply tracking-tight; }
+}
+
+@layer utilities {
+  .bg-gradient-primary { background: var(--gradient-primary); }
+  .bg-gradient-accent { background: var(--gradient-accent); }
+  .bg-gradient-hero { background: var(--gradient-hero); }
+  .shadow-elegant { box-shadow: var(--shadow-elegant); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .text-balance { text-wrap: balance; }
+}
