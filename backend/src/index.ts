@@ -91,6 +91,15 @@ app.use('/api/v1', adminRoutes);
 app.use('/api/v1', opportunityRoutes);
 app.use('/api/v1', userRoutes);
 
+app.get('/api/v1/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    message: 'Backend service is healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // Fallback 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({
