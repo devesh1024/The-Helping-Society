@@ -1,5 +1,6 @@
 import * as commentRepository from '../repositories/commentRepository';
 import mongoose from 'mongoose';
+import { createNotification } from './notificationService';
 
 export const createComment = async (
   ownerId: string | mongoose.Types.ObjectId,
@@ -7,13 +8,58 @@ export const createComment = async (
   targetType: 'resource' | 'lostFound' | 'room' | 'marketplace',
   content: string
 ) => {
-  return commentRepository.createComment({
+  const comment = await commentRepository.createComment({
     ownerId,
     targetId,
     targetType,
     content,
     parentId: null
   });
+
+  // Trigger notification to the author/owner of the target post (if not the one who commented)
+  try {
+    let recipientId: mongoose.Types.ObjectId | null = null;
+    let targetTitle = '';
+    if (targetType === 'lostFound') {
+      const post = await mongoose.model('LostFoundPost').findById(targetId);
+      if (post) {
+        recipientId = post.ownerId;
+        targetTitle = post.title;
+      }
+    } else if (targetType === 'room') {
+      const post = await mongoose.model('RoomPost').findById(targetId);
+      if (post) {
+        recipientId = post.ownerId;
+        targetTitle = post.title;
+      }
+    } else if (targetType === 'marketplace') {
+      const post = await mongoose.model('MarketplacePost').findById(targetId);
+      if (post) {
+        recipientId = post.ownerId;
+        targetTitle = post.title;
+      }
+    } else if (targetType === 'resource') {
+      const post = await mongoose.model('Resource').findById(targetId);
+      if (post) {
+        recipientId = post.uploaderId;
+        targetTitle = post.title;
+      }
+    }
+
+    if (recipientId && recipientId.toString() !== ownerId.toString()) {
+      await createNotification({
+        title: 'New Reply on Your Post',
+        message: `Someone replied to your post: ${targetTitle}`,
+        type: 'comment',
+        recipientId,
+        link: targetType === 'resource' ? `/resources` : `/community`
+      });
+    }
+  } catch (err) {
+    console.error('Failed to trigger comment notification:', err);
+  }
+
+  return comment;
 };
 
 export const createReply = async (
@@ -32,13 +78,30 @@ export const createReply = async (
     throw new Error('Nesting depth limit exceeded: Replies are limited to 1 level.');
   }
 
-  return commentRepository.createComment({
+  const reply = await commentRepository.createComment({
     ownerId,
     targetId: parentComment.targetId,
     targetType: parentComment.targetType,
     parentId: parentComment._id,
     content
   });
+
+  // Trigger notification to the parent comment owner (if not the one who replied)
+  try {
+    if (parentComment.ownerId.toString() !== ownerId.toString()) {
+      await createNotification({
+        title: 'New Reply to Your Comment',
+        message: `Someone replied to your comment: "${parentComment.content.substring(0, 30)}..."`,
+        type: 'reply',
+        recipientId: parentComment.ownerId,
+        link: parentComment.targetType === 'resource' ? '/resources' : '/community'
+      });
+    }
+  } catch (err) {
+    console.error('Failed to trigger reply notification:', err);
+  }
+
+  return reply;
 };
 
 export const updateComment = async (id: string, content: string) => {

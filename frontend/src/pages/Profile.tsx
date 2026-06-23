@@ -7,57 +7,139 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { CheckCircle2, ShieldAlert, Loader2 } from "lucide-react";
-import { z } from "zod";
-
-const schema = z.object({
-  full_name: z.string().trim().min(2).max(100),
-  mobile_number: z.string().trim().max(20).optional().or(z.literal("")),
-  branch: z.string().trim().max(80).optional().or(z.literal("")),
-  year: z.coerce.number().int().min(1).max(2100).optional().or(z.literal("" as any)),
-});
 
 export default function Profile() {
   const { profile, isVerified, refresh, loading } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    full_name: "", mobile_number: "", user_type: "student", branch: "", year: "" as any,
+    fullName: "",
+    phoneNumber: "",
+    branch: "",
+    yearOfRegistration: "" as any,
+    dob: "",
+    organizationName: "",
+    roleInOrganization: "",
   });
 
   useEffect(() => {
-    if (profile) setForm({
-      full_name: profile.full_name || "",
-      mobile_number: profile.mobile_number || "",
-      user_type: profile.user_type,
-      branch: profile.branch || "",
-      year: profile.year ?? ("" as any),
-    });
+    if (profile) {
+      setForm({
+        fullName: profile.full_name || "",
+        phoneNumber: profile.mobile_number || "",
+        branch: profile.branch || "",
+        yearOfRegistration: profile.yearOfRegistration ?? "",
+        dob: profile.dob || "",
+        organizationName: profile.organizationName || "",
+        roleInOrganization: profile.roleInOrganization || "",
+      });
+    }
   }, [profile]);
 
   const save = async () => {
+    if (!profile) return;
     setSaving(true);
     try {
-      const parsed = schema.safeParse(form);
-      if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
-      const { error } = await supabase.from("profiles").update({
-        full_name: form.full_name,
-        mobile_number: form.mobile_number || null,
-        user_type: form.user_type as any,
-        branch: form.branch || null,
-        year: form.year ? Number(form.year) : null,
-      }).eq("id", profile!.id);
-      if (error) throw error;
+      const payload: any = {
+        fullName: form.fullName,
+      };
+
+      if (profile.user_type === "student") {
+        if (!form.fullName || form.fullName.trim().length < 2) {
+          toast.error("Full name must be at least 2 characters long");
+          setSaving(false);
+          return;
+        }
+        if (!form.phoneNumber || form.phoneNumber.trim().length < 10) {
+          toast.error("Phone number must be at least 10 digits");
+          setSaving(false);
+          return;
+        }
+        if (!form.branch) {
+          toast.error("Please select your branch");
+          setSaving(false);
+          return;
+        }
+        if (!form.yearOfRegistration) {
+          toast.error("Please enter your year of registration");
+          setSaving(false);
+          return;
+        }
+
+        const revMap: Record<string, string> = {
+          "Computer Science Engineering": "cs",
+          "Electronics and communication engineering": "ec",
+          "Electrical Engineering": "ee",
+          "Chemical Engineering": "cm",
+          "Mechanical engineering": "me",
+          "Civil Engineering": "ce",
+        };
+        const branchCode = revMap[form.branch] || form.branch;
+
+        payload.phoneNumber = form.phoneNumber;
+        payload.branch = branchCode;
+        payload.yearOfRegistration = Number(form.yearOfRegistration);
+        payload.dob = form.dob;
+      } else if (profile.user_type === "faculty") {
+        if (!form.fullName || form.fullName.trim().length < 2) {
+          toast.error("Full name must be at least 2 characters long");
+          setSaving(false);
+          return;
+        }
+        if (!form.phoneNumber || form.phoneNumber.trim().length < 10) {
+          toast.error("Phone number must be at least 10 digits");
+          setSaving(false);
+          return;
+        }
+        payload.phoneNumber = form.phoneNumber;
+      } else if (profile.user_type === "contributor") {
+        if (!form.fullName || form.fullName.trim().length < 2) {
+          toast.error("Full name must be at least 2 characters long");
+          setSaving(false);
+          return;
+        }
+        if (!form.organizationName || form.organizationName.trim().length < 2) {
+          toast.error("Organization name must be at least 2 characters long");
+          setSaving(false);
+          return;
+        }
+        if (!form.roleInOrganization || form.roleInOrganization.trim().length < 2) {
+          toast.error("Role in organization must be at least 2 characters long");
+          setSaving(false);
+          return;
+        }
+        payload.organizationName = form.organizationName;
+        payload.roleInOrganization = form.roleInOrganization;
+      } else if (profile.user_type === "admin") {
+        if (!form.fullName || form.fullName.trim().length < 2) {
+          toast.error("Full name must be at least 2 characters long");
+          setSaving(false);
+          return;
+        }
+      }
+
+      await api.patch("/users/profile", payload);
       toast.success("Profile updated");
-      refresh();
+      await refresh();
     } catch (e: any) {
-      toast.error(e.message);
-    } finally { setSaving(false); }
+      const msg = e.response?.data?.message || e.response?.data?.errors?.[0]?.message || e.message || "Failed to update profile";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <Layout><div className="container py-20 grid place-items-center"><Loader2 className="animate-spin" /></div></Layout>;
   if (!profile) return <Layout><div className="container py-20">Not signed in.</div></Layout>;
+
+  const roleLabelMap: Record<string, string> = {
+    student: "Student",
+    faculty: "Faculty",
+    contributor: "Contributor",
+    admin: "Administrator",
+  };
 
   return (
     <Layout>
@@ -72,7 +154,7 @@ export default function Profile() {
             <p className="text-sm text-muted-foreground mt-1">
               {isVerified
                 ? "You have full access to upload, comment, like and create posts."
-                : "Please wait for admin approval to get full access."}
+                : "Please wait for email verification and/or admin approval to get full access."}
             </p>
           </div>
           {isVerified && <Badge className="bg-primary text-primary-foreground">Verified</Badge>}
@@ -85,54 +167,67 @@ export default function Profile() {
               <Input value={profile.email} disabled />
             </div>
             <div>
+              <Label>Account Role</Label>
+              <Input value={roleLabelMap[profile.user_type] || profile.user_type} disabled />
+            </div>
+            <div>
               <Label>Full name</Label>
-              <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+              <Input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
             </div>
-            <div>
-              <Label>Mobile</Label>
-              <Input value={form.mobile_number} onChange={(e) => setForm({ ...form, mobile_number: e.target.value })} />
-            </div>
-            <div>
-              <Label>User type</Label>
-              <Select value={form.user_type} onValueChange={(v) => {
-                setForm({ ...form, user_type: v, year: v === "faculty" ? "" as any : form.year });
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="student">Student</SelectItem>
-                  <SelectItem value="alumni">Alumni</SelectItem>
-                  <SelectItem value="faculty">Faculty</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Branch</Label>
-              <Select value={form.branch} onValueChange={(v) => setForm({ ...form, branch: v })}>
-                <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Computer Science Engineering">Computer Science Engineering</SelectItem>
-                  <SelectItem value="Electronics and communication engineering">Electronics and communication engineering</SelectItem>
-                  <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
-                  <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
-                  <SelectItem value="Mechanical engineering">Mechanical engineering</SelectItem>
-                  <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {form.user_type !== "faculty" && (
-              <div>
-                <Label>{form.user_type === "alumni" ? "Passout Year" : "Year"}</Label>
-                {form.user_type === "student" ? (
-                  <Select value={String(form.year || "")} onValueChange={(v) => setForm({ ...form, year: v as any })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+
+            {profile.user_type === "student" && (
+              <>
+                <div>
+                  <Label>Registration Number</Label>
+                  <Input value={profile.registrationNumber || ""} disabled />
+                </div>
+                <div>
+                  <Label>Mobile Number</Label>
+                  <Input value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Branch</Label>
+                  <Select value={form.branch} onValueChange={(v) => setForm({ ...form, branch: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
                     <SelectContent>
-                      {[1,2,3,4].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                      <SelectItem value="Computer Science Engineering">Computer Science Engineering</SelectItem>
+                      <SelectItem value="Electronics and communication engineering">Electronics and communication engineering</SelectItem>
+                      <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                      <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
+                      <SelectItem value="Mechanical engineering">Mechanical engineering</SelectItem>
+                      <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
                     </SelectContent>
                   </Select>
-                ) : (
-                  <Input type="number" placeholder="e.g. 2024" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-                )}
+                </div>
+                <div>
+                  <Label>Year of Registration</Label>
+                  <Input type="number" placeholder="e.g. 2023" value={form.yearOfRegistration} onChange={(e) => setForm({ ...form, yearOfRegistration: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Date of Birth</Label>
+                  <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+                </div>
+              </>
+            )}
+
+            {profile.user_type === "faculty" && (
+              <div>
+                <Label>Mobile Number</Label>
+                <Input value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
               </div>
+            )}
+
+            {profile.user_type === "contributor" && (
+              <>
+                <div>
+                  <Label>Organization Name</Label>
+                  <Input value={form.organizationName} onChange={(e) => setForm({ ...form, organizationName: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Role in Organization</Label>
+                  <Input value={form.roleInOrganization} onChange={(e) => setForm({ ...form, roleInOrganization: e.target.value })} />
+                </div>
+              </>
             )}
           </div>
           <Button variant="hero" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}</Button>

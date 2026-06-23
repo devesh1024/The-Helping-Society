@@ -7,6 +7,7 @@ export interface IRoomPost extends Document {
   location: string;
   contactNumber: string;
   images: string[];
+  metadata?: any;
   ownerId: mongoose.Types.ObjectId;
   expiresAt: Date; // TTL date (7 days from creation)
   createdAt: Date;
@@ -20,6 +21,7 @@ const RoomPostSchema = new Schema<IRoomPost>({
   location: { type: String, required: true, trim: true },
   contactNumber: { type: String, required: true, trim: true },
   images: { type: [String], default: [] },
+  metadata: { type: Schema.Types.Mixed, default: {} },
   ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   expiresAt: { 
     type: Date, 

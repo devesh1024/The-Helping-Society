@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import { LifeBuoy, Loader2, Lock, MessageCircle, Plus, Send, Siren } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { z } from "zod";
-import { notifyAdmins, createNotification } from "@/utils/notifications";
 
 interface Req {
   id: string; author_id: string; subject: string; description: string;
@@ -25,7 +24,26 @@ interface Reply { id: string; request_id: string; author_id: string; message: st
 
 const schema = z.object({
   subject: z.string().trim().min(3).max(150),
-  description: z.string().trim().min(5).max(2000),
+  description: z.string().trim().min(5).max(500, "Description cannot exceed 500 characters"),
+});
+
+const mapBackendToReq = (r: any): Req => ({
+  id: r._id || r.id,
+  author_id: typeof r.ownerId === "object" ? r.ownerId?._id : r.ownerId,
+  subject: r.title,
+  description: r.description,
+  urgency: r.isEmergency ? "emergency" : "standard",
+  anonymous: r.anonymous || false,
+  status: r.status,
+  created_at: r.createdAt || new Date().toISOString(),
+});
+
+const mapBackendToReply = (r: any): Reply => ({
+  id: r._id || r.id,
+  request_id: r.supportRequestId,
+  author_id: typeof r.authorId === "object" ? r.authorId?._id : r.authorId,
+  message: r.message,
+  created_at: r.createdAt || new Date().toISOString(),
 });
 
 export default function Support() {
@@ -37,15 +55,15 @@ export default function Support() {
 
   const load = async () => {
     setLoading(true);
-    let q = supabase.from("support_requests").select("*");
-    
-    // For non-admins, only show approved posts or emergency posts
-    if (!isAdmin) {
-      q = q.or('status.eq.approved,urgency.eq.emergency');
+    try {
+      const response = await api.get("/support-requests?limit=100");
+      const list = response.data?.data?.posts || [];
+      setItems(list.map(mapBackendToReq));
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to load support requests");
+    } finally {
+      setLoading(false);
     }
-    
-    const { data } = await q.order("created_at", { ascending: false });
-    setItems((data as Req[]) ?? []); setLoading(false);
   };
   useEffect(()=>{ load(); }, [isAdmin]);
 
@@ -154,36 +172,24 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open:boolean; onOpenC
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     setBusy(true);
     try {
-      const { error } = await supabase.from("support_requests").insert({
-        author_id: user!.id,
-        subject: parsed.data.subject,
+      await api.post("/support-requests", {
+        title: parsed.data.subject,
         description: parsed.data.description,
-        urgency: emergency ? "emergency" : "standard",
+        isEmergency: emergency,
         anonymous,
-        status: emergency ? "approved" : "pending",
+        contactNumber: user?.mobile_number || "9999999999",
+        location: "Campus"
       });
-      if (error) throw error;
-
-      if (emergency) {
-        await createNotification({
-          user_id: null,
-          title: "New Support Emergency",
-          body: `Something new in Support: ${parsed.data.subject}`,
-          link: "/support"
-        });
-      } else {
-        await notifyAdmins(
-          "Support Request Needs Approval",
-          `A new support request "${parsed.data.subject}" needs your approval.`,
-          "/support"
-        );
-      }
 
       toast.success("Request submitted");
       onOpenChange(false);
       setForm({ subject:"", description:"" }); setEmergency(false); setAnonymous(false);
       onCreated();
-    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+    } catch (e: any) { 
+      toast.error(e.response?.data?.message || e.message || "Failed to submit request"); 
+    } finally { 
+      setBusy(false); 
+    }
   };
 
   return (
@@ -227,41 +233,41 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
   const showAuthor = !req.anonymous || isAdmin || req.author_id === user?.id;
 
   const load = async () => {
-    const { data } = await supabase.from("support_replies").select("*").eq("request_id", req.id).order("created_at");
-    setReplies((data as Reply[]) ?? []);
+    try {
+      const response = await api.get(`/support-requests/${req.id}/replies`);
+      const list = response.data?.data?.replies || [];
+      setReplies(list.map(mapBackendToReply));
+    } catch (err: any) {
+      console.error("Failed to load replies:", err);
+    }
   };
   useEffect(()=>{ load(); /* eslint-disable-next-line */ }, [req.id]);
 
   const send = async () => {
     if (!text.trim()) return;
     setBusy(true);
-    const { error } = await supabase.from("support_replies").insert({ request_id: req.id, author_id: user!.id, message: text.trim() });
-    setBusy(false);
-    if (error) toast.error(error.message); 
-    else { 
-      if (user!.id !== req.author_id) {
-        await createNotification({
-          user_id: req.author_id,
-          title: "New Reply on Support Request",
-          body: `${user!.id === req.author_id ? "You" : "Someone"} replied to your request: ${text.trim()}`,
-          link: "/support"
-        });
-      }
-      setText(""); load(); 
+    try {
+      await api.post(`/support-requests/${req.id}/replies`, { message: text.trim() });
+      setText(""); 
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to post reply");
+    } finally {
+      setBusy(false);
     }
   };
 
   const setStatus = async (status: "approved"|"resolved") => {
-    const { error } = await supabase.from("support_requests").update({ status }).eq("id", req.id);
-    if (error) toast.error(error.message); 
-    else { 
-      await createNotification({
-        user_id: req.author_id,
-        title: `Support Request ${status === "approved" ? "Approved" : "Resolved"}`,
-        body: `Your request "${req.subject}" has been marked as ${status}.`,
-        link: "/support"
-      });
-      toast.success("Updated"); onClose(); 
+    try {
+      if (status === "approved") {
+        await api.patch(`/support-requests/${req.id}/approve`);
+      } else {
+        await api.patch(`/support-requests/${req.id}/resolve`);
+      }
+      toast.success("Updated"); 
+      onClose();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update status");
     }
   };
 

@@ -184,10 +184,11 @@ export const approveUser = async (adminId: string, id: string) => {
     throw new Error('User not found.');
   }
 
-  if (user.status !== 'pendingApproval') {
-    throw new Error(`User status is ${user.status}, approval not applicable.`);
+  if (user.status !== 'pendingApproval' && user.status !== 'disabled') {
+    throw new Error(`User status is ${user.status}, approval/activation not applicable.`);
   }
 
+  const oldStatus = user.status;
   user.status = 'active';
   await user.save();
 
@@ -196,7 +197,9 @@ export const approveUser = async (adminId: string, id: string) => {
     actorId: adminId,
     action: 'approval',
     targetId: user._id,
-    details: `Approved account registration for: "${user.fullName}" (${user.role})`
+    details: oldStatus === 'disabled' 
+      ? `Re-activated/Enabled user account: "${user.fullName}" (${user.role})`
+      : `Approved account registration for: "${user.fullName}" (${user.role})`
   });
 
   return user;
@@ -208,10 +211,11 @@ export const rejectUser = async (adminId: string, id: string) => {
     throw new Error('User not found.');
   }
 
-  if (user.status !== 'pendingApproval') {
-    throw new Error(`User status is ${user.status}, rejection not applicable.`);
+  if (user.status !== 'pendingApproval' && user.status !== 'active') {
+    throw new Error(`User status is ${user.status}, rejection/disablement not applicable.`);
   }
 
+  const oldStatus = user.status;
   user.status = 'disabled';
   await user.save();
 
@@ -220,7 +224,9 @@ export const rejectUser = async (adminId: string, id: string) => {
     actorId: adminId,
     action: 'rejection',
     targetId: user._id,
-    details: `Rejected account registration for: "${user.fullName}" (${user.role})`
+    details: oldStatus === 'active'
+      ? `Disabled user account: "${user.fullName}" (${user.role})`
+      : `Rejected account registration for: "${user.fullName}" (${user.role})`
   });
 
   return user;

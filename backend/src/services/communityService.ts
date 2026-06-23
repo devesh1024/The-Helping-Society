@@ -1,17 +1,32 @@
 import * as communityRepository from '../repositories/communityRepository';
 import * as commentRepository from '../repositories/commentRepository';
 import mongoose from 'mongoose';
+import { createNotification } from './notificationService';
 
 // === Lost & Found ===
 export const createLostFound = async (
   ownerId: string | mongoose.Types.ObjectId,
-  data: { title: string; description: string; contactNumber: string; location: string; images?: string[] }
+  data: { title: string; description: string; contactNumber: string; location: string; images?: string[]; metadata?: any }
 ) => {
-  return communityRepository.createLostFound({
+  const post = await communityRepository.createLostFound({
     ...data,
     ownerId,
     status: 'active'
   });
+
+  try {
+    await createNotification({
+      title: 'New Post in Lost & Found',
+      message: `Something new in Lost & Found: ${post.title}`,
+      type: 'global',
+      recipientId: null,
+      link: '/community'
+    });
+  } catch (err) {
+    console.error('Failed to trigger community global notification:', err);
+  }
+
+  return post;
 };
 
 export const getLostFound = async (query: { page: number; limit: number; status?: string }) => {
@@ -41,7 +56,7 @@ export const getLostFoundById = async (id: string) => {
 
 export const updateLostFound = async (
   id: string,
-  updateData: { title?: string; description?: string; contactNumber?: string; location?: string; images?: string[] }
+  updateData: { title?: string; description?: string; contactNumber?: string; location?: string; images?: string[]; metadata?: any }
 ) => {
   const post = await communityRepository.updateLostFound(id, updateData);
   if (!post) {
@@ -78,14 +93,28 @@ export const resolveLostFound = async (id: string) => {
 // === Rooms ===
 export const createRoom = async (
   ownerId: string | mongoose.Types.ObjectId,
-  data: { title: string; description: string; price: number; location: string; contactNumber: string; images?: string[] }
+  data: { title: string; description: string; price: number; location: string; contactNumber: string; images?: string[]; metadata?: any }
 ) => {
-  return communityRepository.createRoom({
+  const post = await communityRepository.createRoom({
     ...data,
     ownerId,
     // Room listings automatically expire and self-delete after 7 days
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   });
+
+  try {
+    await createNotification({
+      title: 'New Post in Rooms',
+      message: `Something new in Rooms: Room at ${post.location}`,
+      type: 'global',
+      recipientId: null,
+      link: '/community'
+    });
+  } catch (err) {
+    console.error('Failed to trigger community global notification:', err);
+  }
+
+  return post;
 };
 
 export const getRooms = async (query: { page: number; limit: number }) => {
@@ -110,7 +139,7 @@ export const getRoomById = async (id: string) => {
 
 export const updateRoom = async (
   id: string,
-  updateData: { title?: string; description?: string; price?: number; location?: string; contactNumber?: string; images?: string[] }
+  updateData: { title?: string; description?: string; price?: number; location?: string; contactNumber?: string; images?: string[]; metadata?: any }
 ) => {
   const post = await communityRepository.updateRoom(id, updateData);
   if (!post) {
@@ -132,12 +161,26 @@ export const deleteRoom = async (id: string) => {
 // === Marketplace ===
 export const createMarketplace = async (
   ownerId: string | mongoose.Types.ObjectId,
-  data: { title: string; description: string; price: number; contactNumber: string; images: string[] }
+  data: { title: string; description: string; price: number; contactNumber: string; images: string[]; metadata?: any }
 ) => {
-  return communityRepository.createMarketplace({
+  const post = await communityRepository.createMarketplace({
     ...data,
     ownerId
   });
+
+  try {
+    await createNotification({
+      title: 'New Post in Marketplace',
+      message: `Something new in Marketplace: ${post.title}`,
+      type: 'global',
+      recipientId: null,
+      link: '/community'
+    });
+  } catch (err) {
+    console.error('Failed to trigger community global notification:', err);
+  }
+
+  return post;
 };
 
 export const getMarketplace = async (query: { page: number; limit: number }) => {
@@ -162,7 +205,7 @@ export const getMarketplaceById = async (id: string) => {
 
 export const updateMarketplace = async (
   id: string,
-  updateData: { title?: string; description?: string; price?: number; contactNumber?: string; images?: string[] }
+  updateData: { title?: string; description?: string; price?: number; contactNumber?: string; images?: string[]; metadata?: any }
 ) => {
   const post = await communityRepository.updateMarketplace(id, updateData);
   if (!post) {

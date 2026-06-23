@@ -14,6 +14,8 @@ import communityRoutes from './routes/communityRoutes';
 import supportRoutes from './routes/supportRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import adminRoutes from './routes/adminRoutes';
+import opportunityRoutes from './routes/opportunityRoutes';
+import userRoutes from './routes/userRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -60,6 +62,8 @@ const authLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 app.use('/api/v1/auth/login', authLimiter);
 app.use('/api/v1/auth/register', authLimiter);
+app.use('/api/v1/auth/forgot-password', authLimiter);
+app.use('/api/v1/auth/reset-password', authLimiter);
 
 // 4. JSON Parser: Body parsing (with safe size constraints)
 app.use(express.json({ limit: '10mb' }));
@@ -84,6 +88,8 @@ app.use('/api/v1', communityRoutes);
 app.use('/api/v1', supportRoutes);
 app.use('/api/v1', notificationRoutes);
 app.use('/api/v1', adminRoutes);
+app.use('/api/v1', opportunityRoutes);
+app.use('/api/v1', userRoutes);
 
 // Fallback 404 handler
 app.use((req: Request, res: Response) => {

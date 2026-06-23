@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,6 @@ import { Ban, Check, Eye, FileCheck, Loader2, Search, ShieldCheck, Trash2, X } f
 import { formatDistanceToNow } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PdfViewer } from "@/components/PdfViewer";
-import { createNotification } from "@/utils/notifications";
 import { Input } from "@/components/ui/input";
 
 export default function Admin() {
@@ -39,66 +38,96 @@ export default function Admin() {
   );
 }
 
+const mapBackendUserToProfile = (u: any) => ({
+  id: u._id || u.id,
+  full_name: u.fullName || "",
+  email: u.email || "",
+  verified: u.status === 'active',
+  is_disabled: u.status === 'disabled',
+  is_banned: u.status === 'banned',
+  role: u.role || 'student',
+});
+
 function UsersPanel() {
   const { user, isSuperAdmin } = useAuth();
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [roles, setRoles] = useState<Record<string, { role: string; admin_type: string | null }[]>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const load = async () => {
     setLoading(true);
-    const { data: p } = await supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(100);
-    const { data: r } = await supabase.from("user_roles").select("user_id, role, admin_type");
-    setProfiles(p ?? []);
-    const map: any = {};
-    (r ?? []).forEach((row: any) => { (map[row.user_id] ||= []).push(row); });
-    setRoles(map);
-    setLoading(false);
+    try {
+      const response = await api.get("/admin/users?limit=100");
+      const list = response.data?.data?.users || [];
+      setProfiles(list.map(mapBackendUserToProfile));
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to load users");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, []);
 
-  const log = async (action_type: string, target_id: string, details?: any) => {
-    await supabase.from("admin_actions").insert({ admin_id: user!.id, action_type, target_id, details });
+  const canModify = (targetProfile: any) => {
+    if (targetProfile.id === user?.id) return false;
+    return targetProfile.role !== "admin";
   };
 
-  const canModify = (targetId: string) => {
-    if (targetId === user?.id) return false;
-    if (isSuperAdmin) return true;
-    const targetRoles = roles[targetId] || [];
-    const targetRole = targetRoles[0]?.role || "user";
-    return targetRole !== "admin" && targetRole !== "super_admin";
+  const setVerified = async (target: any, v: boolean) => {
+    if (!canModify(target)) { toast.error("Unauthorized action."); return; }
+    try {
+      if (v) {
+        await api.patch(`/admin/users/${target.id}/approve`);
+      } else {
+        await api.patch(`/admin/users/${target.id}/reject`);
+      }
+      toast.success("Updated");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update user verification");
+    }
   };
 
-  const setVerified = async (id: string, v: boolean) => {
-    if (!canModify(id)) { toast.error("Unauthorized action."); return; }
-    await supabase.from("profiles").update({ verified: v }).eq("id", id);
-    await log(v ? "verify_user" : "unverify_user", id);
-    toast.success("Updated"); load();
-  };
-  const setDisabled = async (id: string, v: boolean) => {
-    if (!canModify(id)) { toast.error("Unauthorized action."); return; }
-    await supabase.from("profiles").update({ is_disabled: v }).eq("id", id);
-    await log(v ? "disable_user" : "enable_user", id);
-    toast.success("Updated"); load();
-  };
-  const setBanned = async (id: string, v: boolean) => {
-    if (!isSuperAdmin || id === user?.id) { toast.error("Unauthorized action."); return; }
-    await supabase.from("profiles").update({ is_banned: v }).eq("id", id);
-    await log(v ? "ban_user" : "unban_user", id);
-    toast.success("Updated"); load();
+  const setDisabled = async (target: any, v: boolean) => {
+    if (!canModify(target)) { toast.error("Unauthorized action."); return; }
+    try {
+      if (v) {
+        await api.patch(`/admin/users/${target.id}/reject`);
+      } else {
+        await api.patch(`/admin/users/${target.id}/approve`);
+      }
+      toast.success("Updated");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update user status");
+    }
   };
 
-  const setRole = async (uid: string, role: "admin"|"super_admin"|"user", admin_type: string | null) => {
-    if (!isSuperAdmin) { toast.error("Super admin only"); return; }
-    // remove existing
-    await supabase.from("user_roles").delete().eq("user_id", uid);
-    await supabase.from("user_roles").insert({ user_id: uid, role: role as any, admin_type: admin_type as any });
-    await log("assign_role", uid, { role, admin_type });
-    toast.success("Role updated"); load();
+  const setBanned = async (target: any, v: boolean) => {
+    if (target.id === user?.id) { toast.error("Unauthorized action."); return; }
+    try {
+      if (v) {
+        await api.patch(`/admin/users/${target.id}/ban`);
+      } else {
+        await api.patch(`/admin/users/${target.id}/unban`);
+      }
+      toast.success("Updated");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update user ban status");
+    }
   };
 
-  // Optimized search using filter (efficient for the current user count)
+  const setRole = async (uid: string, role: string) => {
+    try {
+      await api.patch(`/admin/users/${uid}/role`, { role });
+      toast.success("Role updated");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update role");
+    }
+  };
+
   const filteredProfiles = profiles.filter(p => 
     p.full_name?.toLowerCase().includes(search.toLowerCase()) || 
     p.email?.toLowerCase().includes(search.toLowerCase())
@@ -119,9 +148,7 @@ function UsersPanel() {
       </div>
       <div className="space-y-3">
         {filteredProfiles.map((p) => {
-        const userRoles = roles[p.id] || [];
-        const role = userRoles[0]?.role || "user";
-        const at = userRoles[0]?.admin_type || "none";
+        const role = p.role;
         return (
           <Card key={p.id} className="p-4 flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[200px]">
@@ -132,45 +159,36 @@ function UsersPanel() {
               {p.verified ? <Badge className="bg-primary text-primary-foreground">Verified</Badge> : <Badge variant="outline">Unverified</Badge>}
               {p.is_disabled && <Badge variant="secondary">Disabled</Badge>}
               {p.is_banned && <Badge className="bg-destructive text-destructive-foreground">Banned</Badge>}
-              {role !== "user" && <Badge variant="outline">{role}</Badge>}
+              {role !== "student" && <Badge variant="outline">{role}</Badge>}
             </div>
-            {isSuperAdmin && (
+            {isSuperAdmin && p.id !== user?.id && (
               <div className="flex gap-1.5">
-                <Select value={role} onValueChange={(v) => setRole(p.id, v as any, v === "user" ? null : (at === "none" ? null : at))}>
-                  <SelectTrigger className="h-8 w-32"><SelectValue/></SelectTrigger>
+                <Select value={role} onValueChange={(v) => setRole(p.id, v)}>
+                  <SelectTrigger className="h-8 w-36"><SelectValue/></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">user</SelectItem>
+                    <SelectItem value="student">student</SelectItem>
+                    <SelectItem value="faculty">faculty</SelectItem>
+                    <SelectItem value="contributor">contributor</SelectItem>
                     <SelectItem value="admin">admin</SelectItem>
-                    <SelectItem value="super_admin">super_admin</SelectItem>
                   </SelectContent>
                 </Select>
-                {(role === "admin" || role === "super_admin") && (
-                  <Select value={at} onValueChange={(v) => setRole(p.id, role as any, v === "none" ? null : v)}>
-                    <SelectTrigger className="h-8 w-36"><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">no admin type</SelectItem>
-                      <SelectItem value="khabri">khabri</SelectItem>
-                      <SelectItem value="professor">professor</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
               </div>
             )}
             <div className="flex gap-1">
-              {p.id !== user?.id && (isSuperAdmin || (role !== "admin" && role !== "super_admin")) && (
+              {p.id !== user?.id && canModify(p) && (
                 <>
                   {!p.verified && (
-                    <Button size="sm" variant="outline" onClick={() => setVerified(p.id, true)}>
+                    <Button size="sm" variant="outline" onClick={() => setVerified(p, true)}>
                       Verify
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => setDisabled(p.id, !p.is_disabled)}>
+                  <Button size="sm" variant="outline" onClick={() => setDisabled(p, !p.is_disabled)}>
                     {p.is_disabled ? "Enable" : "Disable"}
                   </Button>
                 </>
               )}
               {isSuperAdmin && p.id !== user?.id && (
-                <Button size="sm" variant="destructive" onClick={() => setBanned(p.id, !p.is_banned)}>
+                <Button size="sm" variant="destructive" onClick={() => setBanned(p, !p.is_banned)}>
                   <Ban className="h-3 w-3"/> {p.is_banned ? "Unban" : "Ban"}
                 </Button>
               )}
@@ -184,7 +202,6 @@ function UsersPanel() {
 }
 
 function ResourcesPanel() {
-  const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("pending");
@@ -192,37 +209,57 @@ function ResourcesPanel() {
 
   const load = async () => {
     setLoading(true);
-    let q = supabase.from("resources").select("*").order("created_at", { ascending: false });
-    if (filter !== "all") q = q.eq("status", filter as any);
-    const { data } = await q;
-    setItems(data ?? []); setLoading(false);
+    try {
+      let list: any[] = [];
+      if (filter === "pending" || filter === "rejected" || filter === "all") {
+        const statusVal = filter === "all" ? undefined : filter;
+        const resReqs = await api.get(`/resource-requests?limit=100${statusVal ? `&status=${statusVal}` : ""}`);
+        const reqList = resReqs.data?.data?.requests || [];
+        list = list.concat(reqList.map((r: any) => ({ ...r, id: r._id, isRequest: true })));
+      }
+      if (filter === "approved" || filter === "all") {
+        const resDocs = await api.get("/resources?limit=100");
+        const docList = resDocs.data?.data?.resources || [];
+        list = list.concat(docList.map((r: any) => ({ ...r, id: r._id, status: "approved", isRequest: false })));
+      }
+      // Sort list by date
+      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setItems(list);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to load resources");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, [filter]);
 
-  const log = async (a: string, t: string) => {
-    await supabase.from("admin_actions").insert({ admin_id: user!.id, action_type: a, target_id: t });
-  };
-
   const setStatus = async (it: any, status: "approved"|"rejected") => {
-    const { error } = await supabase.from("resources").update({ status }).eq("id", it.id);
-    if (error) toast.error(error.message); 
-    else { 
-      await log("resource_"+status, it.id); 
-      await createNotification({
-        user_id: it.uploader_id,
-        title: `Resource ${status === "approved" ? "Approved" : "Rejected"}`,
-        body: `Your resource "${it.title}" has been ${status}.`,
-        link: "/resources"
-      });
-      toast.success("Updated"); load(); 
+    try {
+      if (status === "approved") {
+        await api.patch(`/resource-requests/${it.id}/approve`);
+      } else {
+        await api.patch(`/resource-requests/${it.id}/reject`);
+      }
+      toast.success("Updated");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update request");
     }
   };
+
   const remove = async (it: any) => {
     if (!confirm("Delete?")) return;
-    await supabase.storage.from("resources").remove([it.file_path]);
-    await supabase.from("resources").delete().eq("id", it.id);
-    await log("resource_delete", it.id);
-    toast.success("Deleted"); load();
+    try {
+      if (it.isRequest) {
+        await api.patch(`/resource-requests/${it.id}/reject`);
+      } else {
+        await api.delete(`/resources/${it.id}`);
+      }
+      toast.success("Deleted");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete");
+    }
   };
 
   return (
@@ -238,7 +275,9 @@ function ResourcesPanel() {
             <Card key={r.id} className="p-4 flex flex-wrap items-center gap-4">
               <div className="flex-1 min-w-[200px]">
                 <p className="font-semibold">{r.title}</p>
-                <p className="text-xs text-muted-foreground">{r.subject} · Y{r.year} · Sem {r.semester} · {r.branch}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {r.category?.replace('_', ' ')} · {(r.file?.fileSize / 1024 / 1024).toFixed(2)} MB · {r.file?.fileType?.toUpperCase()}
+                </p>
               </div>
               <Badge variant={r.status==="approved"?"default":r.status==="rejected"?"destructive":"outline"}>{r.status}</Badge>
               <div className="flex gap-1">
@@ -263,7 +302,7 @@ function ResourcesPanel() {
           </DialogHeader>
           <div className="flex-1 min-h-0 bg-muted/20">
             {preview && (
-              <PdfViewer url={supabase.storage.from("resources").getPublicUrl(preview.file_path).data.publicUrl} />
+              <PdfViewer url={preview.file?.secureUrl} />
             )}
           </div>
           <div className="p-4 border-t flex justify-end gap-2 bg-background">
@@ -283,55 +322,44 @@ function ResourcesPanel() {
 
 function AuditPanel() {
   const [items, setItems] = useState<any[]>([]);
-  const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from("admin_actions").select("*").order("created_at", { ascending: false }).limit(100);
-      if (data) {
-        setItems(data);
-        const uids = new Set<string>();
-        data.forEach(d => {
-          if (d.admin_id) uids.add(d.admin_id);
-          if (d.target_id && d.target_id.includes("-")) uids.add(d.target_id); // Basic UUID check
-        });
-        if (uids.size > 0) {
-          const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", Array.from(uids));
-          if (profs) {
-            const map: Record<string, any> = {};
-            profs.forEach(p => map[p.id] = p);
-            setProfilesMap(map);
-          }
-        }
+      setLoading(true);
+      try {
+        const response = await api.get("/admin/audit-logs?limit=100");
+        setItems(response.data?.data?.logs || []);
+      } catch (error) {
+        console.error("Failed to load audit logs:", error);
+      } finally {
+        setLoading(false);
       }
     }
     load();
   }, []);
 
+  if (loading) return <div className="py-10 grid place-items-center"><Loader2 className="animate-spin"/></div>;
+
   return (
     <div className="space-y-3">
       {items.map((a) => {
-        const admin = profilesMap[a.admin_id];
-        const target = profilesMap[a.target_id];
+        const adminStr = a.actorId ? (a.actorId.fullName || a.actorId.email) : "Unknown Admin";
         
-        const taskPerformed = a.action_type.replace(/_/g, " ");
-        const targetStr = target ? (target.email || target.full_name) : (a.target_id?.slice(0, 8) || "—");
-        const adminStr = admin ? (admin.full_name || admin.email) : "Unknown Admin";
-
         return (
-          <Card key={a.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <Card key={a._id || a.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
               <FileCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-sm font-semibold capitalize">{taskPerformed}</p>
+                <p className="text-sm font-semibold capitalize">{a.action?.replace(/_/g, " ")}</p>
                 <div className="text-xs text-muted-foreground flex flex-col gap-0.5">
-                  <span><strong className="font-medium text-foreground">Target:</strong> {targetStr}</span>
+                  <span><strong className="font-medium text-foreground">Details:</strong> {a.details || "—"}</span>
                   <span><strong className="font-medium text-foreground">By Admin:</strong> {adminStr}</span>
                 </div>
               </div>
             </div>
             <span className="text-xs text-muted-foreground whitespace-nowrap bg-secondary/50 px-2 py-1 rounded-md self-start md:self-auto">
-              {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
+              {formatDistanceToNow(new Date(a.createdAt || a.created_at), { addSuffix: true })}
             </span>
           </Card>
         );

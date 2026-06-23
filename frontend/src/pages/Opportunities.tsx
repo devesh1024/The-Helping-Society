@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,24 @@ interface Opportunity {
 const TYPE_OPTIONS = ["Part-time", "Full Time", "Remote", "Hybrid"];
 const CATEGORY_OPTIONS = ["Job", "Internship", "Workshop"];
 
+const mapBackendToFrontend = (opp: any): Opportunity => ({
+  id: opp._id || opp.id,
+  company: opp.company || "",
+  role: opp.title || "",
+  description: opp.description || "",
+  apply_url: opp.link || "",
+  category: opp.type === "job" ? "Job" : opp.type === "internship" ? "Internship" : "Workshop",
+  type: opp.workType || "",
+  location: opp.location || null,
+  deadline: opp.deadline || null,
+  status: opp.status || "open",
+  created_at: opp.createdAt || new Date().toISOString(),
+  created_by: typeof opp.createdBy === "object" ? opp.createdBy?._id : opp.createdBy,
+  event_at: opp.eventAt || null,
+  conducted_by: opp.conductedBy || null,
+  mode: opp.mode || null,
+});
+
 export default function Opportunities() {
   const { isKhabri, isAdmin, user } = useAuth();
   const [items, setItems] = useState<Opportunity[]>([]);
@@ -33,16 +51,27 @@ export default function Opportunities() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("opportunities").select("*").order("created_at", { ascending: false });
-    setItems((data as Opportunity[]) ?? []);
-    setLoading(false);
+    try {
+      const response = await api.get("/opportunities");
+      const list = response.data?.data?.opportunities || [];
+      setItems(list.map(mapBackendToFrontend));
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to load opportunities");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, []);
 
   const remove = async (id: string) => {
     if (!confirm("Delete this opportunity?")) return;
-    const { error } = await supabase.from("opportunities").delete().eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
+    try {
+      await api.delete(`/opportunities/${id}`);
+      toast.success("Deleted");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete opportunity");
+    }
   };
 
   return (
@@ -128,10 +157,8 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
     if (!base.success) { toast.error(base.error.issues[0].message); return; }
 
     let payload: any = {
-      category,
       description: base.data.description,
-      apply_url: base.data.apply_url,
-      created_by: user!.id,
+      link: base.data.apply_url,
     };
 
     if (category === "Workshop") {
@@ -140,35 +167,39 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
       if (!form.event_at) { toast.error("Date & time required"); return; }
       payload = {
         ...payload,
-        role: form.title.trim(),
+        title: form.title.trim(),
+        type: "workshop",
         company: form.conducted_by.trim(),
-        type: form.mode,
-        conducted_by: form.conducted_by.trim(),
-        event_at: new Date(form.event_at).toISOString(),
+        conductedBy: form.conducted_by.trim(),
+        eventAt: new Date(form.event_at).toISOString(),
         mode: form.mode,
-        location: form.location || null,
-        deadline: null,
+        location: form.location || undefined,
       };
     } else {
       if (!form.company.trim()) { toast.error("Company required"); return; }
       if (!form.role.trim()) { toast.error("Role required"); return; }
       payload = {
         ...payload,
+        title: form.role.trim(),
+        type: category === "Job" ? "job" : "internship",
         company: form.company.trim(),
-        role: form.role.trim(),
-        type: form.type,
-        location: form.location || null,
-        deadline: form.deadline || null,
+        workType: form.type,
+        location: form.location || undefined,
+        deadline: form.deadline ? new Date(form.deadline).toISOString() : undefined,
       };
     }
 
     setBusy(true);
-    const { error } = await supabase.from("opportunities").insert(payload);
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Posted"); onOpenChange(false); onCreated();
+    try {
+      await api.post("/opportunities", payload);
+      toast.success("Posted"); 
+      onOpenChange(false); 
+      onCreated();
       setForm({ company:"", role:"", description:"", apply_url:"", type:"Full Time", location:"", deadline:"", title:"", conducted_by:"", event_at:"", mode:"Online" });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to post opportunity");
+    } finally {
+      setBusy(false);
     }
   };
 

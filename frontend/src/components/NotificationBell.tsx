@@ -2,13 +2,18 @@ import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { api } from "@/lib/api";
 
 interface Notification {
-  id: string; title: string; body: string | null; link: string | null; read: boolean; created_at: string;
+  id: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
 }
 
 export function NotificationBell() {
@@ -18,32 +23,47 @@ export function NotificationBell() {
 
   const load = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .or(`user_id.eq.${user.id},user_id.is.null`)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    setItems((data as Notification[]) ?? []);
+    try {
+      const res = await api.get("/notifications");
+      const list = res.data.data.notifications || [];
+      const mapped = list.map((n: any) => ({
+        id: n._id,
+        title: n.title,
+        body: n.message,
+        link: n.link,
+        read: n.isRead,
+        created_at: n.createdAt,
+      }));
+      setItems(mapped);
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+    }
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => {
+    load();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
-    const channel = supabase
-      .channel("notifications-bell")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, load)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(() => {
+      load();
+    }, 10000);
+    return () => {
+      clearInterval(interval);
+    };
   }, [user]);
 
   const unread = items.filter((i) => !i.read).length;
 
   const markRead = async () => {
     if (!user || unread === 0) return;
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
-    load();
+    try {
+      await api.patch("/notifications/read-all");
+      load();
+    } catch (err) {
+      console.error("Failed to mark notifications as read:", err);
+    }
   };
 
   return (

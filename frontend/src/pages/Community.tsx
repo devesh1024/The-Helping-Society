@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +15,7 @@ import { Heart, Loader2, Lock, MessageCircle, Plus, Send, Trash2 } from "lucide-
 import { formatDistanceToNow } from "date-fns";
 import { z } from "zod";
 import { FileDropzone } from "@/components/FileDropzone";
-import { createNotification } from "@/utils/notifications";
+import { api } from "@/lib/api";
 
 const cats = [
   { v: "lost_found", label: "Lost & Found" },
@@ -25,12 +24,29 @@ const cats = [
 ] as const;
 
 interface Post {
-  id: string; author_id: string; category: "lost_found"|"rooms"|"marketplace";
-  title: string; content: string; tags: string[]; price: number | null; images: string[];
+  id: string;
+  author_id: string;
+  category: "lost_found" | "rooms" | "marketplace";
+  title: string;
+  content: string;
+  tags: string[];
+  price: number | null;
+  images: string[];
   metadata?: Record<string, string>;
   created_at: string;
 }
-interface Reply { id: string; post_id: string; author_id: string; content: string; created_at: string; }
+
+interface Reply {
+  id: string;
+  post_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  owner?: {
+    fullName: string;
+    email: string;
+  };
+}
 
 const schema = z.object({
   title: z.string().trim().min(2).max(150),
@@ -39,7 +55,7 @@ const schema = z.object({
 
 export default function Community() {
   const { user, isVerified, isAdmin } = useAuth();
-  const [tab, setTab] = useState<"lost_found"|"rooms"|"marketplace">("lost_found");
+  const [tab, setTab] = useState<"lost_found" | "rooms" | "marketplace">("lost_found");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCreate, setOpenCreate] = useState(false);
@@ -47,16 +63,43 @@ export default function Community() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("community_posts").select("*").eq("category", tab).order("created_at", { ascending: false });
-    setPosts((data as Post[]) ?? []); setLoading(false);
+    try {
+      const endpoint = tab === "lost_found" ? "/lost-found" : tab === "rooms" ? "/rooms" : "/marketplace";
+      const res = await api.get(endpoint);
+      const backendPosts = res.data.data.posts || [];
+      const mapped = backendPosts.map((p: any) => ({
+        id: p._id,
+        author_id: p.ownerId,
+        category: tab,
+        title: p.title,
+        content: p.description,
+        price: p.price,
+        images: p.images || [],
+        metadata: p.metadata || {},
+        created_at: p.createdAt,
+      }));
+      setPosts(mapped);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to load posts");
+    } finally {
+      setLoading(false);
+    }
   };
-  useEffect(() => { load(); }, [tab]);
+
+  useEffect(() => {
+    load();
+  }, [tab]);
 
   const remove = async (p: Post) => {
     if (!confirm("Delete post?")) return;
-    if (p.images?.length) await supabase.storage.from("community-images").remove(p.images);
-    await supabase.from("community_posts").delete().eq("id", p.id);
-    toast.success("Deleted"); load();
+    try {
+      const endpoint = tab === "lost_found" ? `/lost-found/${p.id}` : tab === "rooms" ? `/rooms/${p.id}` : `/marketplace/${p.id}`;
+      await api.delete(endpoint);
+      toast.success("Deleted");
+      load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to delete post");
+    }
   };
 
   return (
@@ -88,17 +131,16 @@ export default function Community() {
         )}
 
         {loading ? (
-          <div className="grid md:grid-cols-2 gap-4">{Array.from({length:4}).map((_,i)=><Card key={i} className="h-40 animate-pulse bg-muted/40"/>)}</div>
+          <div className="grid md:grid-cols-2 gap-4">{Array.from({ length: 4 }).map((_, i) => <Card key={i} className="h-40 animate-pulse bg-muted/40" />)}</div>
         ) : posts.length === 0 ? (
           <Card className="p-12 text-center text-muted-foreground">Nothing here yet. Be the first.</Card>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
             {posts.map((p) => (
-              <Card key={p.id} className="p-5 hover:shadow-elegant transition-smooth cursor-pointer" 
+              <Card key={p.id} className="p-5 hover:shadow-elegant transition-smooth cursor-pointer"
                 onClick={() => isVerified ? setOpenPost(p) : toast.error("Get verified to see details")}>
                 {p.images?.[0] && (
-                  <img src={supabase.storage.from("community-images").getPublicUrl(p.images[0]).data.publicUrl}
-                       alt="" className="rounded-lg w-full h-44 object-cover mb-3" />
+                  <img src={p.images[0]} alt="" className="rounded-lg w-full h-44 object-cover mb-3" />
                 )}
                 <div className="flex justify-between items-start gap-2">
                   <h3 className="font-display font-semibold text-lg leading-snug">{p.title}</h3>
@@ -132,10 +174,10 @@ export default function Community() {
 }
 
 function CreateDialog({ open, onOpenChange, category, onCreated }:
-  { open:boolean; onOpenChange:(v:boolean)=>void; category:"lost_found"|"rooms"|"marketplace"; onCreated:()=>void }) {
+  { open: boolean; onOpenChange: (v: boolean) => void; category: "lost_found" | "rooms" | "marketplace"; onCreated: () => void }) {
   const { user } = useAuth();
-  const [form, setForm] = useState({ 
-    title:"", content:"", price:"",
+  const [form, setForm] = useState({
+    title: "", content: "", price: "",
     room_type: "", room_type_other: "", allowed_for: "", contact_number: "",
     rent: "", location: "", furnishing: "", time_used: ""
   });
@@ -147,7 +189,7 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
     const actualContent = form.content || " ";
     const parsed = schema.safeParse({ title: actualTitle, content: actualContent });
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
-    
+
     let metadata: any = {};
     if (category === "rooms") {
       metadata = {
@@ -159,12 +201,12 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
         contact: form.contact_number
       };
       if (!metadata.room_type || !metadata.location || !form.rent || !form.contact_number) {
-         toast.error("Please fill all required room fields"); return;
+        toast.error("Please fill all required room fields"); return;
       }
     } else if (category === "marketplace") {
       metadata = { time_used: form.time_used, contact: form.contact_number, price: form.price };
       if (!form.title || !form.price || !form.contact_number) {
-         toast.error("Please fill all required marketplace fields"); return;
+        toast.error("Please fill all required marketplace fields"); return;
       }
     }
 
@@ -173,59 +215,69 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
         toast.error("Contact number must be exactly 10 digits"); return;
       }
     }
-    
+
     if (files.length === 0) { toast.error("At least one image/video required"); return; }
     if (files.some(f => f.size > 50 * 1024 * 1024)) {
       toast.error("Videos/images cannot exceed 50MB"); return;
     }
-    
+
     setBusy(true);
     try {
-      const paths: string[] = [];
+      const urls: string[] = [];
       for (const f of files) {
-        const path = `${user!.id}/${Date.now()}-${f.name.replace(/[^a-z0-9.\-_]/gi,"_")}`;
-        const { error } = await supabase.storage.from("community-images").upload(path, f);
-        if (error) throw error;
-        paths.push(path);
+        const formData = new FormData();
+        formData.append("file", f);
+        const res = await api.post("/community/upload", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        if (res.data.success) {
+          urls.push(res.data.data.secureUrl);
+        } else {
+          throw new Error(res.data.message || "Failed to upload image");
+        }
       }
-      const { error } = await supabase.from("community_posts").insert({
-        author_id: user!.id, category,
-        title: actualTitle, content: actualContent,
-        price: form.price && !isNaN(Number(form.price)) ? Number(form.price) : null,
-        metadata,
-        tags: [],
-        images: paths,
-      });
-      if (error) throw error;
-      
-      const categoryLabel = cats.find(c => c.v === category)?.label || category;
-      await createNotification({
-        user_id: null,
-        title: `New Post in ${categoryLabel}`,
-        body: `Something new in ${categoryLabel}: ${actualTitle}`,
-        link: "/community"
-      });
 
-      toast.success("Post created"); onOpenChange(false); onCreated();
-      setForm({ title:"", content:"", price:"", room_type:"", room_type_other:"", allowed_for:"", contact_number:"", rent:"", location:"", furnishing:"", time_used:"" }); 
+      const endpoint = category === "lost_found" ? "/lost-found" : category === "rooms" ? "/rooms" : "/marketplace";
+      const payload = {
+        title: actualTitle,
+        description: actualContent,
+        price: category === "marketplace" ? parseFloat(form.price) : category === "rooms" ? parseFloat(form.rent) : null,
+        location: form.location,
+        contactNumber: form.contact_number,
+        images: urls,
+        metadata,
+      };
+
+      await api.post(endpoint, payload);
+
+      toast.success("Post created");
+      onOpenChange(false);
+      onCreated();
+      setForm({ title: "", content: "", price: "", room_type: "", room_type_other: "", allowed_for: "", contact_number: "", rent: "", location: "", furnishing: "", time_used: "" });
       setFiles([]);
-    } catch (e:any) { toast.error(e.message); } finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || e.message || "Failed to create post");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>New post in {cats.find(c=>c.v===category)?.label}</DialogTitle>
+          <DialogTitle>New post in {cats.find(c => c.v === category)?.label}</DialogTitle>
           <DialogDescription className="sr-only">Create a new community post.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 max-h-[70vh] overflow-y-auto px-1">
           {category === "rooms" && (
             <>
-              <div><Label>Room Location</Label><Input value={form.location} onChange={(e)=>setForm({...form, location:e.target.value})} placeholder="e.g. Near North Gate" /></div>
+              <div><Label>Room Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Near North Gate" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Type of Room</Label>
-                  <Select value={form.room_type} onValueChange={(v)=>setForm({...form, room_type: v})}>
+                  <Select value={form.room_type} onValueChange={(v) => setForm({ ...form, room_type: v })}>
                     <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1bhk">1 BHK</SelectItem>
@@ -237,7 +289,7 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
                   </Select>
                 </div>
                 <div><Label>Allowed for</Label>
-                  <Select value={form.allowed_for} onValueChange={(v)=>setForm({...form, allowed_for: v})}>
+                  <Select value={form.allowed_for} onValueChange={(v) => setForm({ ...form, allowed_for: v })}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="boys">Boys</SelectItem>
@@ -248,11 +300,11 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
                 </div>
               </div>
               {form.room_type === "other" && (
-                <div><Label>Specify Room Type</Label><Input placeholder="e.g. 1 RK" value={form.room_type_other} onChange={(e)=>setForm({...form, room_type_other: e.target.value})} /></div>
+                <div><Label>Specify Room Type</Label><Input placeholder="e.g. 1 RK" value={form.room_type_other} onChange={(e) => setForm({ ...form, room_type_other: e.target.value })} /></div>
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Furnishing</Label>
-                  <Select value={form.furnishing} onValueChange={(v)=>setForm({...form, furnishing: v})}>
+                  <Select value={form.furnishing} onValueChange={(v) => setForm({ ...form, furnishing: v })}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unfurnished">Unfurnished</SelectItem>
@@ -261,82 +313,90 @@ function CreateDialog({ open, onOpenChange, category, onCreated }:
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>Rent per month</Label><Input type="text" value={form.rent} onChange={(e)=>setForm({...form, rent:e.target.value})} placeholder="e.g. ₹5000" /></div>
+                <div><Label>Rent per month</Label><Input type="text" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} placeholder="e.g. 5000" /></div>
               </div>
-              <div><Label>Contact Number</Label><Input type="tel" value={form.contact_number} onChange={(e)=>setForm({...form, contact_number:e.target.value})} /></div>
+              <div><Label>Contact Number</Label><Input type="tel" value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value })} /></div>
             </>
           )}
 
           {category === "marketplace" && (
             <>
-              <div><Label>Item Name</Label><Input value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/></div>
+              <div><Label>Item Name</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Price</Label><Input type="text" value={form.price} onChange={(e)=>setForm({...form,price:e.target.value})} placeholder="e.g. ₹1200 or Negotiable"/></div>
-                <div><Label>Time Used</Label><Input type="text" value={form.time_used} onChange={(e)=>setForm({...form,time_used:e.target.value})} placeholder="e.g. 6 months" /></div>
+                <div><Label>Price</Label><Input type="text" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="e.g. 1200" /></div>
+                <div><Label>Time Used</Label><Input type="text" value={form.time_used} onChange={(e) => setForm({ ...form, time_used: e.target.value })} placeholder="e.g. 6 months" /></div>
               </div>
-              <div><Label>Contact Number</Label><Input type="tel" value={form.contact_number} onChange={(e)=>setForm({...form, contact_number:e.target.value})} /></div>
+              <div><Label>Contact Number</Label><Input type="tel" value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value })} /></div>
             </>
           )}
 
           {category === "lost_found" && (
-            <div><Label>Title</Label><Input value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/></div>
+            <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
           )}
-          
-          <div><Label>Description / Details</Label><Textarea rows={4} value={form.content} onChange={(e)=>setForm({...form,content:e.target.value})}/></div>
-          
+
+          <div><Label>Description / Details</Label><Textarea rows={4} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} /></div>
+
           <div>
             <Label>Photos / Videos (Max 50MB) <span className="text-destructive">*</span></Label>
             <FileDropzone accept="image/*,video/*" multiple files={files} onFiles={setFiles} hint="Drag & drop, click, or paste images/videos" />
           </div>
-          <Button variant="hero" className="w-full mt-2" onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Post"}</Button>
+          <Button variant="hero" className="w-full mt-2" onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post"}</Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
-  const { user, isVerified } = useAuth();
+function PostDialog({ post, onClose }: { post: Post; onClose: () => void }) {
+  const { isVerified } = useAuth();
   const [replies, setReplies] = useState<Reply[]>([]);
-  const [authors, setAuthors] = useState<Record<string, { full_name: string; email: string }>>({});
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase.from("community_replies").select("*").eq("post_id", post.id).order("created_at");
-    const list = (data as Reply[]) ?? [];
-    setReplies(list);
-    const ids = Array.from(new Set(list.map((r) => r.author_id)));
-    if (ids.length) {
-      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
-      const map: any = {};
-      (profs ?? []).forEach((p: any) => { map[p.id] = { full_name: p.full_name, email: p.email }; });
-      setAuthors(map);
+    try {
+      const targetType = post.category === "lost_found" ? "lostFound" : post.category === "rooms" ? "room" : "marketplace";
+      const res = await api.get(`/comments?targetId=${post.id}&targetType=${targetType}`);
+      const comments = res.data.data.comments || [];
+      const mapped = comments.map((c: any) => ({
+        id: c._id,
+        post_id: c.targetId,
+        author_id: c.ownerId?._id || c.ownerId,
+        content: c.content,
+        created_at: c.createdAt,
+        owner: c.ownerId,
+      }));
+      setReplies(mapped);
+    } catch (err: any) {
+      console.error("Failed to load replies:", err);
     }
   };
-  useEffect(()=>{ load(); /* eslint-disable-next-line */ }, [post.id]);
+
+  useEffect(() => {
+    load();
+  }, [post.id]);
 
   const send = async () => {
     if (!text.trim()) return;
     setBusy(true);
-    const { error } = await supabase.from("community_replies").insert({ post_id: post.id, author_id: user!.id, content: text.trim() });
-    setBusy(false);
-    if (error) toast.error(error.message); 
-    else { 
-      if (user!.id !== post.author_id) {
-        await createNotification({
-          user_id: post.author_id,
-          title: "New Reply on Your Post",
-          body: `Someone replied to your post: ${post.title}`,
-          link: "/community"
-        });
-      }
-      setText(""); load(); 
+    try {
+      const targetType = post.category === "lost_found" ? "lostFound" : post.category === "rooms" ? "room" : "marketplace";
+      await api.post("/comments", {
+        targetId: post.id,
+        targetType,
+        content: text.trim(),
+      });
+      setText("");
+      load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to post reply");
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <Dialog open onOpenChange={(o)=>!o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{post.title}</DialogTitle>
@@ -347,11 +407,11 @@ function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
             {post.metadata?.rent ? post.metadata.rent : `₹${post.metadata?.price || post.price}`}
           </Badge>
         )}
-        
+
         {post.metadata && Object.keys(post.metadata).length > 0 && (
           <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2 my-2 text-sm bg-muted/30 p-4 rounded-lg">
             {Object.entries(post.metadata).map(([k, v]) => (
-              v && (
+              v && k !== "price" && k !== "rent" && (
                 <div key={k} className="flex gap-2">
                   <span className="font-semibold text-muted-foreground capitalize">{k.replace("_", " ")}: </span>
                   <span className="text-foreground font-medium">{v}</span>
@@ -363,24 +423,23 @@ function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
 
         {post.images?.length > 0 && (
           <div className="grid grid-cols-2 gap-2">
-            {post.images.map((img,i)=>{
-              const url = supabase.storage.from("community-images").getPublicUrl(img).data.publicUrl;
+            {post.images.map((img, i) => {
+              const url = img;
               const isVideo = img.match(/\.(mp4|webm|ogg)$/i);
               return isVideo ? (
                 <video key={i} src={url} controls className="rounded-lg w-full h-40 object-cover bg-black" />
               ) : (
-                <img key={i} src={url} className="rounded-lg w-full h-40 object-cover"/>
+                <img key={i} src={url} className="rounded-lg w-full h-40 object-cover" />
               );
             })}
           </div>
         )}
         <p className="text-sm whitespace-pre-wrap mt-2">{post.content}</p>
         <div className="border-t border-border pt-4 mt-4">
-          <p className="font-semibold text-sm mb-2 flex items-center gap-2"><MessageCircle className="h-4 w-4"/> Replies ({replies.length})</p>
+          <p className="font-semibold text-sm mb-2 flex items-center gap-2"><MessageCircle className="h-4 w-4" /> Replies ({replies.length})</p>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {replies.map((r)=>{
-              const a = authors[r.author_id];
-              const name = a?.full_name || a?.email?.split("@")[0] || "User";
+            {replies.map((r) => {
+              const name = r.owner?.fullName || r.owner?.email?.split("@")[0] || "User";
               return (
                 <div key={r.id} className="bg-muted/50 rounded-lg p-3 text-sm">
                   <div className="flex items-center gap-2 mb-1">
@@ -397,8 +456,8 @@ function PostDialog({ post, onClose }: { post: Post; onClose: ()=>void }) {
           </div>
           {isVerified && (
             <div className="flex gap-2 mt-3">
-              <Input value={text} onChange={(e)=>setText(e.target.value)} placeholder="Write a reply…" onKeyDown={(e)=>e.key==="Enter"&&send()}/>
-              <Button onClick={send} disabled={busy}><Send className="h-4 w-4"/></Button>
+              <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a reply…" onKeyDown={(e) => e.key === "Enter" && send()} />
+              <Button onClick={send} disabled={busy}><Send className="h-4 w-4" /></Button>
             </div>
           )}
         </div>

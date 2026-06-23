@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as communityService from '../services/communityService';
+import { uploadImageBuffer } from '../utils/cloudinary';
 
 // === Lost & Found ===
 export const createLostFound = async (req: Request, res: Response, next: NextFunction) => {
@@ -8,11 +9,17 @@ export const createLostFound = async (req: Request, res: Response, next: NextFun
       return res.status(401).json({ success: false, message: 'Unauthorized.' });
     }
 
-    const { title, description, contactNumber, location, images } = req.body;
-    if (!title || !description || !contactNumber || !location) {
+    const title = req.body.title;
+    const description = req.body.description || req.body.content;
+    const metadata = req.body.metadata || {};
+    const location = req.body.location || metadata.location || 'Campus';
+    const contactNumber = req.body.contactNumber || metadata.contact || (req.user as any).phoneNumber || req.user.email;
+    const images = req.body.images || [];
+
+    if (!title || !description) {
       return res.status(400).json({
         success: false,
-        message: 'Title, description, contactNumber, and location are required.'
+        message: 'Title and description are required.'
       });
     }
 
@@ -21,7 +28,8 @@ export const createLostFound = async (req: Request, res: Response, next: NextFun
       description,
       contactNumber,
       location,
-      images
+      images,
+      metadata
     });
 
     return res.status(201).json({
@@ -74,13 +82,14 @@ export const getLostFoundById = async (req: Request, res: Response, next: NextFu
 
 export const updateLostFound = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, description, contactNumber, location, images } = req.body;
+    const { title, description, content, contactNumber, location, images, metadata } = req.body;
     const post = await communityService.updateLostFound(req.params.id, {
       title,
-      description,
+      description: description || content,
       contactNumber,
       location,
-      images
+      images,
+      metadata
     });
 
     return res.status(200).json({
@@ -137,21 +146,32 @@ export const createRoom = async (req: Request, res: Response, next: NextFunction
       return res.status(401).json({ success: false, message: 'Unauthorized.' });
     }
 
-    const { title, description, price, location, contactNumber, images } = req.body;
-    if (!title || !description || price === undefined || !location || !contactNumber) {
+    const metadata = req.body.metadata || {};
+    const location = req.body.location || metadata.location;
+    const contactNumber = req.body.contactNumber || metadata.contact || (req.user as any).phoneNumber || req.user.email;
+    const title = req.body.title || `Room at ${location || 'Campus'}`;
+    const description = req.body.description || req.body.content || ' ';
+    const priceRaw = req.body.price !== undefined ? req.body.price : metadata.rent;
+    const images = req.body.images || [];
+
+    const cleanPrice = String(priceRaw || '0').replace(/[^\d.]/g, '');
+    const price = parseFloat(cleanPrice) || 0;
+
+    if (!location || !contactNumber) {
       return res.status(400).json({
         success: false,
-        message: 'Title, description, price, location, and contactNumber are required.'
+        message: 'Location and contactNumber are required.'
       });
     }
 
     const post = await communityService.createRoom(req.user._id, {
       title,
       description,
-      price: parseFloat(price),
+      price,
       location,
       contactNumber,
-      images
+      images,
+      metadata
     });
 
     return res.status(201).json({
@@ -203,14 +223,22 @@ export const getRoomById = async (req: Request, res: Response, next: NextFunctio
 
 export const updateRoom = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, description, price, location, contactNumber, images } = req.body;
+    const { title, description, content, price, location, contactNumber, images, metadata } = req.body;
+    
+    let priceNum: number | undefined = undefined;
+    if (price !== undefined && price !== null) {
+      const cleanPrice = String(price).replace(/[^\d.]/g, '');
+      priceNum = parseFloat(cleanPrice) || 0;
+    }
+
     const post = await communityService.updateRoom(req.params.id, {
       title,
-      description,
-      price: price !== undefined ? parseFloat(price) : undefined,
+      description: description || content,
+      price: priceNum,
       location,
       contactNumber,
-      images
+      images,
+      metadata
     });
 
     return res.status(200).json({
@@ -250,20 +278,30 @@ export const createMarketplace = async (req: Request, res: Response, next: NextF
       return res.status(401).json({ success: false, message: 'Unauthorized.' });
     }
 
-    const { title, description, price, contactNumber, images } = req.body;
-    if (!title || !description || price === undefined || !contactNumber || !images) {
+    const metadata = req.body.metadata || {};
+    const title = req.body.title;
+    const description = req.body.description || req.body.content || ' ';
+    const priceRaw = req.body.price !== undefined ? req.body.price : metadata.price;
+    const contactNumber = req.body.contactNumber || metadata.contact || (req.user as any).phoneNumber || req.user.email;
+    const images = req.body.images || [];
+
+    const cleanPrice = String(priceRaw || '0').replace(/[^\d.]/g, '');
+    const price = parseFloat(cleanPrice) || 0;
+
+    if (!title || !description || !contactNumber || !images || images.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Title, description, price, contactNumber, and images array are required.'
+        message: 'Title, description, contactNumber, and at least one image are required.'
       });
     }
 
     const post = await communityService.createMarketplace(req.user._id, {
       title,
       description,
-      price: parseFloat(price),
+      price,
       contactNumber,
-      images
+      images,
+      metadata
     });
 
     return res.status(201).json({
@@ -315,13 +353,21 @@ export const getMarketplaceById = async (req: Request, res: Response, next: Next
 
 export const updateMarketplace = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, description, price, contactNumber, images } = req.body;
+    const { title, description, content, price, contactNumber, images, metadata } = req.body;
+    
+    let priceNum: number | undefined = undefined;
+    if (price !== undefined && price !== null) {
+      const cleanPrice = String(price).replace(/[^\d.]/g, '');
+      priceNum = parseFloat(cleanPrice) || 0;
+    }
+
     const post = await communityService.updateMarketplace(req.params.id, {
       title,
-      description,
-      price: price !== undefined ? parseFloat(price) : undefined,
+      description: description || content,
+      price: priceNum,
       contactNumber,
-      images
+      images,
+      metadata
     });
 
     return res.status(200).json({
@@ -350,6 +396,30 @@ export const deleteMarketplace = async (req: Request, res: Response, next: NextF
     return res.status(status).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+export const uploadImage = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+
+    const result = await uploadImageBuffer(req.file.buffer);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Image uploaded successfully.',
+      data: {
+        secureUrl: result.secure_url,
+        publicId: result.public_id
+      }
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to upload image.'
     });
   }
 };

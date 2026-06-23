@@ -1,7 +1,11 @@
 import { Router } from 'express';
+import multer from 'multer';
 import * as communityController from '../controllers/communityController';
 import * as commentController from '../controllers/commentController';
 import { authenticateUser, authorizeRoles, authorizeOwnership } from '../middleware/authMiddleware';
+import { sanitizeMiddleware } from '../middleware/sanitizeMiddleware';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
@@ -13,6 +17,7 @@ router.post(
   '/lost-found',
   authenticateUser,
   authorizeRoles(...studentCreatorRoles),
+  sanitizeMiddleware,
   communityController.createLostFound
 );
 
@@ -59,6 +64,7 @@ router.post(
   '/rooms',
   authenticateUser,
   authorizeRoles(...studentCreatorRoles),
+  sanitizeMiddleware,
   communityController.createRoom
 );
 
@@ -166,6 +172,15 @@ router.get(
   authenticateUser,
   authorizeRoles(...generalRoles),
   commentController.getCommentsByTarget
+);
+
+// Multipart media upload for community posts
+router.post(
+  '/community/upload',
+  authenticateUser,
+  authorizeRoles(...generalRoles),
+  upload.single('file'),
+  communityController.uploadImage
 );
 
 export default router;

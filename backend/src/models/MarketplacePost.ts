@@ -6,6 +6,7 @@ export interface IMarketplacePost extends Document {
   price: number;
   images: string[];
   contactNumber: string;
+  metadata?: any;
   ownerId: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +27,7 @@ const MarketplacePostSchema = new Schema<IMarketplacePost>({
     }
   },
   contactNumber: { type: String, required: true, trim: true },
+  metadata: { type: Schema.Types.Mixed, default: {} },
   ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 

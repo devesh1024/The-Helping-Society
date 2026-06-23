@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as supportController from '../controllers/supportController';
 import { authenticateUser, authorizeRoles, authorizeOwnership } from '../middleware/authMiddleware';
+import { sanitizeMiddleware } from '../middleware/sanitizeMiddleware';
 
 const router = Router();
 
@@ -69,6 +70,22 @@ router.patch(
   authenticateUser,
   authorizeRoles(...generalRoles),
   supportController.resolveSupportRequest
+);
+
+// Support Request Replies routes
+router.post(
+  '/support-requests/:id/replies',
+  authenticateUser,
+  authorizeRoles(...generalRoles),
+  sanitizeMiddleware,
+  supportController.createSupportReply
+);
+
+router.get(
+  '/support-requests/:id/replies',
+  authenticateUser,
+  authorizeRoles(...generalRoles),
+  supportController.getSupportReplies
 );
 
 export default router;

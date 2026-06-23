@@ -1,5 +1,8 @@
 import * as supportRepository from '../repositories/supportRepository';
 import { AuditLog } from '../models/AuditLog';
+import { SupportReply } from '../models/SupportReply';
+import { User } from '../models/User';
+import { createNotification } from './notificationService';
 import mongoose from 'mongoose';
 
 export const createSupportRequest = async (
@@ -7,21 +10,53 @@ export const createSupportRequest = async (
   data: {
     title: string;
     description: string;
-    contactNumber: string;
-    location: string;
+    contactNumber?: string;
+    location?: string;
     images?: string[];
     isEmergency?: boolean;
+    anonymous?: boolean;
   }
 ) => {
   const isEmergency = data.isEmergency || false;
   // If emergency, go live instantly
   const status = isEmergency ? 'approved' : 'pending';
 
-  return supportRepository.createSupportRequest({
+  const request = await supportRepository.createSupportRequest({
     ...data,
     ownerId,
     status
   });
+
+  // Trigger Notifications:
+  try {
+    if (isEmergency) {
+      // 1. Emergency support request -> global notification
+      await createNotification({
+        title: 'New Support Emergency',
+        message: `Emergency Support Request: "${request.title}"`,
+        type: 'global',
+        recipientId: null,
+        link: '/support'
+      });
+    } else {
+      // 2. Standard support request -> notify all admin users
+      const admins = await User.find({ role: 'admin' }).select('_id').exec();
+      const notificationPromises = admins.map(admin => 
+        createNotification({
+          title: 'Support Request Needs Approval',
+          message: `A new support request "${request.title}" needs your approval.`,
+          type: 'global',
+          recipientId: admin._id as mongoose.Types.ObjectId,
+          link: '/support'
+        })
+      );
+      await Promise.all(notificationPromises);
+    }
+  } catch (err) {
+    console.error('Failed to trigger support request notifications:', err);
+  }
+
+  return request;
 };
 
 export const getSupportRequests = async (
@@ -185,6 +220,19 @@ export const approveRequest = async (id: string, adminId: string) => {
     details: `Approved support request: "${request.title}"`
   });
 
+  // Trigger Notification to request owner
+  try {
+    await createNotification({
+      title: 'Support Request Approved',
+      message: `Your support request "${request.title}" has been approved.`,
+      type: 'global',
+      recipientId: request.ownerId,
+      link: '/support'
+    });
+  } catch (err) {
+    console.error('Failed to notify support owner of approval:', err);
+  }
+
   return updated;
 };
 
@@ -208,6 +256,19 @@ export const rejectRequest = async (id: string, adminId: string) => {
     details: `Rejected support request: "${request.title}"`
   });
 
+  // Trigger Notification to request owner
+  try {
+    await createNotification({
+      title: 'Support Request Rejected',
+      message: `Your support request "${request.title}" has been rejected.`,
+      type: 'global',
+      recipientId: request.ownerId,
+      link: '/support'
+    });
+  } catch (err) {
+    console.error('Failed to notify support owner of rejection:', err);
+  }
+
   return updated;
 };
 
@@ -230,5 +291,94 @@ export const resolveRequest = async (
     throw new Error('Support request is already resolved.');
   }
 
-  return supportRepository.updateSupportRequest(id, { status: 'resolved' });
+  const updated = await supportRepository.updateSupportRequest(id, { status: 'resolved' });
+
+  // Trigger Notification to request owner
+  try {
+    await createNotification({
+      title: 'Support Request Resolved',
+      message: `Your support request "${request.title}" has been resolved.`,
+      type: 'global',
+      recipientId: request.ownerId,
+      link: '/support'
+    });
+  } catch (err) {
+    console.error('Failed to notify support owner of resolution:', err);
+  }
+
+  return updated;
+};
+
+export const createSupportReply = async (
+  userId: string | mongoose.Types.ObjectId,
+  role: string,
+  supportRequestId: string,
+  message: string
+) => {
+  const request = await supportRepository.findSupportRequestById(supportRequestId);
+  if (!request) {
+    throw new Error('Support request not found.');
+  }
+
+  // Authorization check: Only the request owner or an admin can reply
+  if (role !== 'admin' && request.ownerId.toString() !== userId.toString()) {
+    throw new Error('Forbidden: You do not have permission to reply to this support request.');
+  }
+
+  const reply = await SupportReply.create({
+    supportRequestId,
+    authorId: userId,
+    message
+  });
+
+  // Trigger Notification
+  try {
+    if (userId.toString() !== request.ownerId.toString()) {
+      // If replier is admin, notify request owner
+      await createNotification({
+        title: 'New Reply on Support Request',
+        message: `An administrator has replied to your request: "${request.title}"`,
+        type: 'reply',
+        recipientId: request.ownerId,
+        link: '/support'
+      });
+    } else {
+      // If replier is request owner, notify all admins
+      const admins = await User.find({ role: 'admin' }).select('_id').exec();
+      const notificationPromises = admins.map(admin => 
+        createNotification({
+          title: 'New Reply on Support Request',
+          message: `User replied to support request: "${request.title}"`,
+          type: 'reply',
+          recipientId: admin._id as mongoose.Types.ObjectId,
+          link: '/support'
+        })
+      );
+      await Promise.all(notificationPromises);
+    }
+  } catch (err) {
+    console.error('Failed to notify support reply:', err);
+  }
+
+  return reply;
+};
+
+export const getSupportReplies = async (
+  userId: string | mongoose.Types.ObjectId,
+  role: string,
+  supportRequestId: string
+) => {
+  const request = await supportRepository.findSupportRequestById(supportRequestId);
+  if (!request) {
+    throw new Error('Support request not found.');
+  }
+
+  // Authorization check: Only the request owner or an admin can view replies
+  if (role !== 'admin' && request.ownerId.toString() !== userId.toString()) {
+    throw new Error('Forbidden: You do not have permission to view replies for this support request.');
+  }
+
+  return SupportReply.find({ supportRequestId })
+    .sort({ createdAt: 1 })
+    .exec();
 };

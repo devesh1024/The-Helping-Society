@@ -8,6 +8,14 @@ export interface IOpportunity extends Document {
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  company?: string;
+  location?: string;
+  deadline?: Date;
+  status?: 'open' | 'closed';
+  eventAt?: Date;
+  conductedBy?: string;
+  mode?: string;
+  workType?: string;
 }
 
 const OpportunitySchema = new Schema<IOpportunity>({
@@ -30,7 +38,15 @@ const OpportunitySchema = new Schema<IOpportunity>({
       message: 'Opportunity link must be a valid absolute HTTP or HTTPS URL.'
     }
   },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  company: { type: String, trim: true },
+  location: { type: String, trim: true },
+  deadline: { type: Date },
+  status: { type: String, enum: ['open', 'closed'], default: 'open' },
+  eventAt: { type: Date },
+  conductedBy: { type: String, trim: true },
+  mode: { type: String, trim: true },
+  workType: { type: String, trim: true }
 }, { timestamps: true });
 
 OpportunitySchema.index({ type: 1 });

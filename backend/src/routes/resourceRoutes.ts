@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import * as resourceController from '../controllers/resourceController';
 import { authenticateUser, authorizeRoles, authorizeOwnership } from '../middleware/authMiddleware';
+import { sanitizeMiddleware } from '../middleware/sanitizeMiddleware';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -11,6 +12,7 @@ router.post(
   '/resources/request',
   authenticateUser,
   authorizeRoles('student', 'coreTeam'),
+  sanitizeMiddleware,
   upload.single('file'),
   resourceController.submitUploadRequest
 );
@@ -20,6 +22,7 @@ router.post(
   '/resources',
   authenticateUser,
   authorizeRoles('faculty', 'admin'),
+  sanitizeMiddleware,
   upload.single('file'),
   resourceController.directUpload
 );

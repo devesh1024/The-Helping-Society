@@ -3,10 +3,11 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface ISupportRequest extends Document {
   title: string;
   description: string;
-  contactNumber: string;
-  location: string;
+  contactNumber?: string;
+  location?: string;
   images: string[];
   isEmergency: boolean;
+  anonymous: boolean;
   status: 'pending' | 'approved' | 'rejected' | 'resolved';
   ownerId: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -21,10 +22,11 @@ const SupportRequestSchema = new Schema<ISupportRequest>({
     trim: true,
     maxlength: [500, 'Description cannot exceed 500 characters']
   },
-  contactNumber: { type: String, required: true, trim: true },
-  location: { type: String, required: true, trim: true },
+  contactNumber: { type: String, trim: true },
+  location: { type: String, trim: true },
   images: { type: [String], default: [] },
   isEmergency: { type: Boolean, default: false },
+  anonymous: { type: Boolean, default: false },
   status: { 
     type: String, 
     enum: ['pending', 'approved', 'rejected', 'resolved'], 

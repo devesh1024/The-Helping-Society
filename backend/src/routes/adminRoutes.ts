@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as adminController from '../controllers/adminController';
 import { authenticateUser, authorizeRoles } from '../middleware/authMiddleware';
+import { sanitizeMiddleware } from '../middleware/sanitizeMiddleware';
 
 const router = Router();
 
@@ -8,6 +9,7 @@ const router = Router();
 router.post(
   '/reports',
   authenticateUser,
+  sanitizeMiddleware,
   adminController.createReport
 );
 

@@ -6,6 +6,7 @@ export interface ILostFoundPost extends Document {
   contactNumber: string;
   location: string;
   images: string[];
+  metadata?: any;
   status: 'active' | 'resolved';
   ownerId: mongoose.Types.ObjectId;
   resolvedAt?: Date | null;
@@ -17,9 +18,10 @@ export interface ILostFoundPost extends Document {
 const LostFoundPostSchema = new Schema<ILostFoundPost>({
   title: { type: String, required: true, trim: true },
   description: { type: String, required: true, trim: true },
-  contactNumber: { type: String, required: true, trim: true },
-  location: { type: String, required: true, trim: true },
+  contactNumber: { type: String, trim: true, default: '' },
+  location: { type: String, trim: true, default: '' },
   images: { type: [String], default: [] },
+  metadata: { type: Schema.Types.Mixed, default: {} },
   status: { 
     type: String, 
     enum: ['active', 'resolved'], 

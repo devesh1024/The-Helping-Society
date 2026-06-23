@@ -27,6 +27,7 @@ export const findByTarget = async (
   targetType: string
 ): Promise<IComment[]> => {
   return Comment.find({ targetId, targetType })
+    .populate('ownerId', 'fullName email')
     .sort({ createdAt: 1 })
     .exec();
 };

@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { api, setAccessToken, clearAccessToken } from "@/lib/api";
 
 export type AppRole = "super_admin" | "admin" | "user";
 export type AdminType = "khabri" | "professor" | null;
@@ -9,19 +8,36 @@ export interface Profile {
   id: string;
   full_name: string;
   email: string;
-  college_name: string;
   mobile_number: string | null;
-  user_type: "student" | "alumni" | "faculty";
-  branch: string | null;
-  year: number | null;
+  user_type: "student" | "faculty" | "contributor" | "admin";
   verified: boolean;
   is_disabled: boolean;
   is_banned: boolean;
+  
+  // Student fields
+  registrationNumber?: string;
+  branch?: string | null;
+  yearOfRegistration?: number;
+  dob?: string;
+  isCoreTeam?: boolean;
+
+  // Contributor fields
+  organizationName?: string;
+  roleInOrganization?: string;
+
+  // Backward compatibility helper
+  year?: number;
+}
+
+export interface AppUser {
+  id: string;
+  email: string;
+  role: 'student' | 'faculty' | 'contributor' | 'admin';
+  fullName: string;
 }
 
 interface AuthContextValue {
-  user: User | null;
-  session: Session | null;
+  user: AppUser | null;
   profile: Profile | null;
   roles: AppRole[];
   adminType: AdminType;
@@ -32,63 +48,168 @@ interface AuthContextValue {
   isKhabri: boolean;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
+  signIn: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const mapUserToProfile = (u: any): Profile | null => {
+  if (!u) return null;
+  const currentYear = new Date().getFullYear();
+  let computedYear: number | null = null;
+  
+  if (u.role === 'student' && u.yearOfRegistration) {
+    computedYear = currentYear - u.yearOfRegistration + 1;
+    if (computedYear < 1) computedYear = 1;
+    if (computedYear > 4) computedYear = 4;
+  } else if (u.year) {
+    computedYear = u.year;
+  }
+
+  const branchMap: Record<string, string> = {
+    cs: "Computer Science Engineering",
+    ec: "Electronics and communication engineering",
+    ee: "Electrical Engineering",
+    cm: "Chemical Engineering",
+    me: "Mechanical engineering",
+    ce: "Civil Engineering",
+  };
+
+  return {
+    id: u._id,
+    full_name: u.fullName || "",
+    email: u.email || "",
+    mobile_number: u.phoneNumber || null,
+    user_type: u.role,
+    verified: u.status === 'active',
+    is_disabled: u.status === 'disabled',
+    is_banned: u.status === 'banned',
+    registrationNumber: u.registrationNumber,
+    branch: u.branch ? (branchMap[u.branch.toLowerCase()] || u.branch) : null,
+    yearOfRegistration: u.yearOfRegistration,
+    dob: u.dob ? new Date(u.dob).toISOString().split('T')[0] : undefined,
+    isCoreTeam: u.isCoreTeam,
+    organizationName: u.organizationName,
+    roleInOrganization: u.roleInOrganization,
+    year: computedYear || undefined,
+  };
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [adminType, setAdminType] = useState<AdminType>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (uid: string) => {
-    const [{ data: prof }, { data: roleRows }] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
-      supabase.from("user_roles").select("role, admin_type").eq("user_id", uid),
-    ]);
-    setProfile((prof as Profile) ?? null);
-    setRoles(((roleRows ?? []) as any[]).map((r) => r.role));
-    const at = (roleRows ?? []).find((r: any) => r.admin_type)?.admin_type ?? null;
-    setAdminType(at);
+  const loadProfile = async () => {
+    try {
+      const response = await api.get("/auth/me");
+      const u = response.data.data.user;
+      
+      setUser({
+        id: u._id,
+        email: u.email,
+        role: u.role,
+        fullName: u.fullName
+      });
+
+      const prof = mapUserToProfile(u);
+      setProfile(prof);
+
+      // Determine roles and adminType
+      const rolesList: AppRole[] = [];
+      let at: AdminType = null;
+      if (u.role === 'admin') {
+        rolesList.push('admin', 'super_admin');
+        at = 'khabri';
+      } else if (u.role === 'contributor') {
+        rolesList.push('admin');
+        at = 'khabri';
+      } else if (u.role === 'faculty') {
+        rolesList.push('user');
+        at = 'professor';
+      } else if (u.role === 'student') {
+        rolesList.push('user');
+        if (u.isCoreTeam) {
+          rolesList.push('admin');
+          at = 'khabri';
+        }
+      }
+      setRoles(rolesList);
+      setAdminType(at);
+    } catch (err) {
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setAdminType(null);
+      throw err;
+    }
   };
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      setUser(sess?.user ?? null);
-      if (sess?.user) {
-        setTimeout(() => loadProfile(sess.user.id), 0);
-      } else {
+    const initAuth = async () => {
+      try {
+        const response = await api.post("/auth/refresh-token");
+        const { accessToken } = response.data.data;
+        setAccessToken(accessToken);
+        await loadProfile();
+      } catch (err) {
+        clearAccessToken();
+        setUser(null);
         setProfile(null);
         setRoles([]);
         setAdminType(null);
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) loadProfile(s.user.id).finally(() => setLoading(false));
-      else setLoading(false);
-    });
+    initAuth();
 
-    return () => sub.subscription.unsubscribe();
+    const handleAuthExpired = () => {
+      clearAccessToken();
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setAdminType(null);
+    };
+
+    window.addEventListener("auth-session-expired", handleAuthExpired);
+    return () => {
+      window.removeEventListener("auth-session-expired", handleAuthExpired);
+    };
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await api.post("/auth/logout");
+    } catch (e) {
+      console.error("Logout request failed:", e);
+    } finally {
+      clearAccessToken();
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setAdminType(null);
+    }
+  };
+
+  const signIn = async (token: string) => {
+    setAccessToken(token);
+    await loadProfile();
   };
 
   const refresh = async () => {
-    if (user) await loadProfile(user.id);
+    try {
+      await loadProfile();
+    } catch (err) {
+      console.error("Refresh profile failed:", err);
+    }
   };
 
   const value: AuthContextValue = {
     user,
-    session,
     profile,
     roles,
     adminType,
@@ -99,6 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isKhabri: adminType === "khabri" || roles.includes("super_admin"),
     signOut,
     refresh,
+    signIn,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

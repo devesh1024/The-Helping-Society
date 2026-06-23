@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as supportService from '../services/supportService';
-import { CreateSupportRequestSchema, UpdateSupportRequestSchema } from '../validators/supportValidator';
+import { CreateSupportRequestSchema, UpdateSupportRequestSchema, CreateSupportReplySchema } from '../validators/supportValidator';
 
 export const createSupportRequest = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -201,6 +201,66 @@ export const resolveSupportRequest = async (req: Request, res: Response, next: N
     return res.status(statusCode).json({
       success: false,
       message: error.message || 'Failed to resolve support request.'
+    });
+  }
+};
+
+export const createSupportReply = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized.' });
+    }
+
+    const validatedData = CreateSupportReplySchema.parse(req.body);
+    const reply = await supportService.createSupportReply(
+      req.user._id,
+      req.user.role,
+      req.params.id, // Support Request ID
+      validatedData.message
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Support reply posted successfully.',
+      data: { reply }
+    });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation Failed',
+        errors: error.errors
+      });
+    }
+    const statusCode = error.message.includes('Forbidden') ? 403 : 400;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to post reply.'
+    });
+  }
+};
+
+export const getSupportReplies = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized.' });
+    }
+
+    const replies = await supportService.getSupportReplies(
+      req.user._id,
+      req.user.role,
+      req.params.id // Support Request ID
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { replies }
+    });
+  } catch (error: any) {
+    const statusCode = error.message.includes('Forbidden') ? 403 : 400;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to retrieve replies.'
     });
   }
 };

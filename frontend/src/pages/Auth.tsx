@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,67 +11,162 @@ import { z } from "zod";
 import { Logo } from "@/components/Logo";
 import { motion } from "framer-motion";
 import { ArrowRight, Github, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const signupSchema = z.object({
-  full_name: z.string().trim().min(2, "Name too short").max(100),
-  email: z.string().trim().email().max(255),
-  password: z.string().min(8, "Min 8 characters").max(72),
+const baseRegistrationNumberRegex = /^0701(cs|ce|ec|ee|me|cm)\d{2}(\d{4}|3d\d{2})$/i;
+const studentEmailRegex = /^0701(cs|ce|ec|ee|me|cm)\d{2}(\d{4}|3d\d{2})@uecu\.ac\.in$/i;
+const facultyEmailRegex = /^[a-zA-Z0-9._%+-]+@uecu\.ac\.in$/i;
+
+const studentSignupSchema = z.object({
+  fullName: z.string().trim().min(2, "Full name must be at least 2 characters long"),
+  email: z.string().trim().email("Invalid email address").regex(studentEmailRegex, {
+    message: "Institutional email must match your registration number structure (e.g. 0701cs231026@uecu.ac.in)."
+  }),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
+  registrationNumber: z.string().regex(baseRegistrationNumberRegex, {
+    message: "Registration number must match regular UECU or direct-entry diploma formats."
+  }),
+  branch: z.enum(['cs', 'ce', 'ec', 'ee', 'me', 'cm']),
+  yearOfRegistration: z.coerce.number().int().min(2000).max(new Date().getFullYear()),
+  dob: z.string().min(1, "Date of birth is required"),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits").max(15),
+}).refine((data) => {
+  const emailPrefix = data.email.split('@')[0].toLowerCase();
+  return emailPrefix === data.registrationNumber.toLowerCase();
+}, {
+  message: "Email must match your registration number.",
+  path: ["email"]
+});
+
+const facultySignupSchema = z.object({
+  fullName: z.string().trim().min(2, "Full name must be at least 2 characters long"),
+  email: z.string().trim().email("Invalid email address").regex(facultyEmailRegex, {
+    message: "Faculty email must belong to the college domain (@uecu.ac.in)."
+  }),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits").max(15),
+});
+
+const contributorSignupSchema = z.object({
+  fullName: z.string().trim().min(2, "Full name must be at least 2 characters long"),
+  email: z.string().trim().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
+  organizationName: z.string().trim().min(2, "Organization name must be at least 2 characters long"),
+  roleInOrganization: z.string().trim().min(2, "Role in organization must be at least 2 characters long"),
 });
 
 const loginSchema = z.object({
-  email: z.string().trim().email().max(255),
-  password: z.string().min(1).max(72),
+  email: z.string().trim().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
 });
 
 export default function Auth() {
   const [params] = useSearchParams();
   const initialMode = params.get("mode") === "signup" ? "signup" : "login";
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
+  
+  // Auth state
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
+  // Common fields
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [role, setRole] = useState<"student" | "faculty" | "contributor">("student");
+
+  // Student specific fields
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [branch, setBranch] = useState<any>("");
+  const [yearOfRegistration, setYearOfRegistration] = useState("");
+  const [dob, setDob] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
+  // Contributor specific fields
+  const [organizationName, setOrganizationName] = useState("");
+  const [roleInOrganization, setRoleInOrganization] = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       if (mode === "signup") {
-        const parsed = signupSchema.safeParse({ full_name: fullName, email, password });
-        if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
-        const { error } = await supabase.auth.signUp({
-          email: parsed.data.email,
-          password: parsed.data.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: { full_name: parsed.data.full_name },
-          },
-        });
-        if (error) throw error;
-        toast.success("Account created. Welcome!");
-        navigate("/profile");
+        let payload: any = {};
+        let url = "";
+
+        if (role === "student") {
+          const parsed = studentSignupSchema.safeParse({
+            fullName,
+            email,
+            password,
+            registrationNumber,
+            branch,
+            yearOfRegistration,
+            dob,
+            phoneNumber,
+          });
+          if (!parsed.success) {
+            toast.error(parsed.error.issues[0].message);
+            setLoading(false);
+            return;
+          }
+          payload = parsed.data;
+          url = "/auth/register/student";
+        } else if (role === "faculty") {
+          const parsed = facultySignupSchema.safeParse({
+            fullName,
+            email,
+            password,
+            phoneNumber,
+          });
+          if (!parsed.success) {
+            toast.error(parsed.error.issues[0].message);
+            setLoading(false);
+            return;
+          }
+          payload = parsed.data;
+          url = "/auth/register/faculty";
+        } else if (role === "contributor") {
+          const parsed = contributorSignupSchema.safeParse({
+            fullName,
+            email,
+            password,
+            organizationName,
+            roleInOrganization,
+          });
+          if (!parsed.success) {
+            toast.error(parsed.error.issues[0].message);
+            setLoading(false);
+            return;
+          }
+          payload = parsed.data;
+          url = "/auth/register/contributor";
+        }
+
+        const res = await api.post(url, payload);
+        toast.success(res.data.message || "Registration successful! Verification email sent.");
+        setMode("login");
       } else {
         const parsed = loginSchema.safeParse({ email, password });
-        if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
-        const { error } = await supabase.auth.signInWithPassword({ email: parsed.data.email, password: parsed.data.password });
-        if (error) throw error;
-        toast.success("Signed in");
+        if (!parsed.success) {
+          toast.error(parsed.error.issues[0].message);
+          setLoading(false);
+          return;
+        }
+        const res = await api.post("/auth/login", parsed.data);
+        const { accessToken } = res.data.data;
+        
+        await signIn(accessToken);
+        toast.success("Signed in successfully");
         navigate("/");
       }
     } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
+      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || err.message || "Something went wrong";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  };
-
-  const githubSignIn = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: { redirectTo: `${window.location.origin}/` },
-    });
-    if (error) toast.error("GitHub OAuth not configured. Enable it in your backend settings.");
   };
 
   return (
@@ -94,32 +190,106 @@ export default function Auth() {
         <p className="text-xs opacity-70 relative">© {new Date().getFullYear()} The Helping Society</p>
       </div>
 
-      <div className="flex items-center justify-center p-6 sm:p-12">
-        <Card className="w-full max-w-md p-8 shadow-elegant border-border/60">
+      <div className="flex items-center justify-center p-6 sm:p-12 overflow-y-auto">
+        <Card className="w-full max-w-md p-8 shadow-elegant border-border/60 my-8">
           <div className="lg:hidden flex justify-center mb-6">
             <Logo className="h-12 w-12" />
           </div>
           <h1 className="font-display text-2xl font-bold">{mode === "signup" ? "Create your account" : "Welcome back"}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {mode === "signup" ? "Sign up with your college email for full access." : "Sign in to continue."}
+            {mode === "signup" ? "Sign up with your details for full access." : "Sign in to continue."}
           </p>
 
           <form onSubmit={submit} className="mt-6 space-y-4">
             {mode === "signup" && (
-              <div>
-                <Label htmlFor="name">Full name</Label>
-                <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-              </div>
+              <>
+                <div>
+                  <Label htmlFor="role">Account Type</Label>
+                  <Select value={role} onValueChange={(val: any) => setRole(val)}>
+                    <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="faculty">Faculty</SelectItem>
+                      <SelectItem value="contributor">Contributor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                </div>
+              </>
             )}
+
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@uecu.ac.in" value={email} onChange={(e) => setEmail(e.target.value)} required />
-
+              <Input id="email" type="email" placeholder={role === "student" && mode === "signup" ? "0701cs231026@uecu.ac.in" : "you@example.com"} value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
+
             <div>
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
+
+            {mode === "signup" && role === "student" && (
+              <>
+                <div>
+                  <Label htmlFor="regNum">Registration Number</Label>
+                  <Input id="regNum" placeholder="e.g. 0701cs231026" value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="branch">Branch</Label>
+                    <Select value={branch} onValueChange={(val) => setBranch(val)}>
+                      <SelectTrigger id="branch"><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cs">CS</SelectItem>
+                        <SelectItem value="ce">CE</SelectItem>
+                        <SelectItem value="ec">EC</SelectItem>
+                        <SelectItem value="ee">EE</SelectItem>
+                        <SelectItem value="me">ME</SelectItem>
+                        <SelectItem value="cm">CM</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="yearReg">Year of Reg</Label>
+                    <Input id="yearReg" type="number" placeholder="e.g. 2023" value={yearOfRegistration} onChange={(e) => setYearOfRegistration(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input id="phone" placeholder="e.g. 9876543200" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {mode === "signup" && role === "faculty" && (
+              <div>
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input id="phone" placeholder="e.g. 9876543200" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
+              </div>
+            )}
+
+            {mode === "signup" && role === "contributor" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="orgName">Organization</Label>
+                  <Input id="orgName" placeholder="e.g. Google" value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} required />
+                </div>
+                <div>
+                  <Label htmlFor="orgRole">Role</Label>
+                  <Input id="orgRole" placeholder="e.g. Engineer" value={roleInOrganization} onChange={(e) => setRoleInOrganization(e.target.value)} required />
+                </div>
+              </div>
+            )}
+
             <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{mode === "signup" ? "Create account" : "Sign in"} <ArrowRight className="h-4 w-4" /></>}
             </Button>
@@ -129,8 +299,8 @@ export default function Auth() {
             <div className="flex-1 h-px bg-border" /> OR <div className="flex-1 h-px bg-border" />
           </div>
 
-          <Button type="button" variant="outline" className="w-full" onClick={githubSignIn}>
-            <Github className="h-4 w-4" /> Continue with GitHub
+          <Button type="button" variant="outline" className="w-full cursor-not-allowed opacity-50" disabled>
+            <Github className="h-4 w-4" /> Continue with GitHub (Local Only)
           </Button>
 
           <p className="mt-6 text-sm text-center text-muted-foreground">
