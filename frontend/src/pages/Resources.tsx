@@ -21,6 +21,8 @@ interface Resource {
   title: string;
   description: string;
   category: "notes" | "pyqs" | "books" | "syllabus" | "study_material";
+  year: "1st year" | "2nd year" | "3rd year" | "4th year";
+  branch: string;
   file: {
     publicId: string;
     secureUrl: string;
@@ -40,6 +42,19 @@ const resourceSchema = z.object({
   category: z.enum(['notes', 'pyqs', 'books', 'syllabus', 'study_material'], {
     errorMap: () => ({ message: "Please select a category" })
   }),
+  year: z.enum(['1st year', '2nd year', '3rd year', '4th year'], {
+    errorMap: () => ({ message: "Please select a year" })
+  }),
+  branch: z.enum([
+    'Computer Science and Engineering',
+    'Electronic and Communication Engineering',
+    'Electrical Engineering',
+    'Mechanical Engineering',
+    'Civil Engineering',
+    'Chemical Engineering'
+  ], {
+    errorMap: () => ({ message: "Please select a branch" })
+  }),
 });
 
 const categoryLabelMap: Record<string, string> = {
@@ -57,6 +72,8 @@ export default function Resources() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [category, setCategory] = useState<string>("all");
+  const [year, setYear] = useState<string>("all");
+  const [branch, setBranch] = useState<string>("all");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
@@ -86,6 +103,14 @@ export default function Resources() {
         params.category = category;
       }
 
+      if (year !== "all") {
+        params.year = year;
+      }
+
+      if (branch !== "all") {
+        params.branch = branch;
+      }
+
       const res = await api.get("/resources", { params });
       const { resources, total: totalCount } = res.data.data;
       setItems(resources || []);
@@ -99,7 +124,7 @@ export default function Resources() {
 
   useEffect(() => {
     load();
-  }, [debounced, category, page]);
+  }, [debounced, category, year, branch, page]);
 
   const toggleLike = async (r: Resource) => {
     if (!user || !isVerified) {
@@ -193,7 +218,7 @@ export default function Resources() {
             <Input className="pl-9" placeholder="Search title or description…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} />
           </div>
           <Select value={category} onValueChange={(v) => { setCategory(v); setPage(0); }}>
-            <SelectTrigger className="w-48"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Category" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="notes">Notes</SelectItem>
@@ -201,6 +226,28 @@ export default function Resources() {
               <SelectItem value="books">Books</SelectItem>
               <SelectItem value="syllabus">Syllabus</SelectItem>
               <SelectItem value="study_material">Study Material</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={year} onValueChange={(v) => { setYear(v); setPage(0); }}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Year" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Years</SelectItem>
+              <SelectItem value="1st year">1st Year</SelectItem>
+              <SelectItem value="2nd year">2nd Year</SelectItem>
+              <SelectItem value="3rd year">3rd Year</SelectItem>
+              <SelectItem value="4th year">4th Year</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={branch} onValueChange={(v) => { setBranch(v); setPage(0); }}>
+            <SelectTrigger className="w-56"><SelectValue placeholder="Branch" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Branches</SelectItem>
+              <SelectItem value="Computer Science and Engineering">Computer Science and Engineering</SelectItem>
+              <SelectItem value="Electronic and Communication Engineering">Electronic and Communication Engineering</SelectItem>
+              <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+              <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
+              <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+              <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
             </SelectContent>
           </Select>
         </Card>
@@ -229,7 +276,9 @@ export default function Resources() {
                 <Card key={r._id} className="p-5 flex flex-col hover:shadow-elegant transition-smooth">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">{categoryLabelMap[r.category] || r.category}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                        {categoryLabelMap[r.category] || r.category} · {r.year} · {r.branch?.replace(' Engineering', '')}
+                      </p>
                       <h3 className="font-display font-semibold text-lg leading-snug mt-1">{r.title}</h3>
                     </div>
                     <Badge variant="outline" className="capitalize">{r.file.fileType}</Badge>
@@ -280,7 +329,7 @@ export default function Resources() {
 
 function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpenChange: (v: boolean) => void; onUploaded: () => void }) {
   const { user } = useAuth();
-  const [form, setForm] = useState({ title: "", description: "", category: "" });
+  const [form, setForm] = useState({ title: "", description: "", category: "", year: "", branch: "" });
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -318,6 +367,8 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
       formData.append("title", parsed.data.title);
       formData.append("description", parsed.data.description);
       formData.append("category", parsed.data.category);
+      formData.append("year", parsed.data.year);
+      formData.append("branch", parsed.data.branch);
 
       const isRequestMode = user.role === "student";
       const endpoint = isRequestMode ? "/resources/request" : "/resources";
@@ -330,7 +381,7 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
 
       toast.success(res.data.message || "Submitted successfully");
       onOpenChange(false);
-      setForm({ title: "", description: "", category: "" });
+      setForm({ title: "", description: "", category: "", year: "", branch: "" });
       setFiles([]);
       onUploaded();
     } catch (e: any) {
@@ -352,16 +403,44 @@ function UploadDialog({ open, onOpenChange, onUploaded }: { open: boolean; onOpe
             <Label>Title</Label>
             <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Category</Label>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="notes">Notes</SelectItem>
+                  <SelectItem value="pyqs">PYQs</SelectItem>
+                  <SelectItem value="books">Books</SelectItem>
+                  <SelectItem value="syllabus">Syllabus</SelectItem>
+                  <SelectItem value="study_material">Study Material</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Year</Label>
+              <Select value={form.year} onValueChange={(v) => setForm({ ...form, year: v })}>
+                <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1st year">1st Year</SelectItem>
+                  <SelectItem value="2nd year">2nd Year</SelectItem>
+                  <SelectItem value="3rd year">3rd Year</SelectItem>
+                  <SelectItem value="4th year">4th Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div>
-            <Label>Category</Label>
-            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-              <SelectTrigger><SelectValue placeholder="Select Category" /></SelectTrigger>
+            <Label>Branch</Label>
+            <Select value={form.branch} onValueChange={(v) => setForm({ ...form, branch: v })}>
+              <SelectTrigger><SelectValue placeholder="Select Branch" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="notes">Notes</SelectItem>
-                <SelectItem value="pyqs">PYQs</SelectItem>
-                <SelectItem value="books">Books</SelectItem>
-                <SelectItem value="syllabus">Syllabus</SelectItem>
-                <SelectItem value="study_material">Study Material</SelectItem>
+                <SelectItem value="Computer Science and Engineering">Computer Science and Engineering</SelectItem>
+                <SelectItem value="Electronic and Communication Engineering">Electronic and Communication Engineering</SelectItem>
+                <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
+                <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+                <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -4,7 +4,7 @@ import { Logo } from "./Logo";
 export function Footer() {
   return (
     <footer className="border-t border-border bg-muted/30 mt-20">
-      <div className="container py-10 grid gap-6 md:grid-cols-3">
+      <div className="container py-10 grid gap-6 md:grid-cols-4">
         <div className="flex items-start gap-3">
           <Logo className="h-10 w-10" />
           <div>
@@ -21,6 +21,15 @@ export function Footer() {
             <li><Link to="/opportunities" className="hover:text-primary transition-smooth">Opportunities</Link></li>
             <li><Link to="/community" className="hover:text-primary transition-smooth">Community</Link></li>
             <li><Link to="/support" className="hover:text-primary transition-smooth">Support</Link></li>
+          </ul>
+        </div>
+        <div>
+          <p className="font-semibold text-sm mb-2">Legal</p>
+          <ul className="text-sm text-muted-foreground space-y-1.5 flex flex-col">
+            <li><Link to="/legal/privacy" className="hover:text-primary transition-smooth">Privacy Policy</Link></li>
+            <li><Link to="/legal/terms" className="hover:text-primary transition-smooth">Terms & Conditions</Link></li>
+            <li><Link to="/legal/cookies" className="hover:text-primary transition-smooth">Cookie Policy</Link></li>
+            <li><Link to="/legal/disclaimer" className="hover:text-primary transition-smooth">Disclaimer</Link></li>
           </ul>
         </div>
         <div>

@@ -12,31 +12,35 @@ interface IFileMetadata {
 }
 
 export const submitUploadRequest = async (
-  uploaderId: string | mongoose.Types.ObjectId,
-  resourceData: { title: string; description: string; category: string },
-  fileMetadata: IFileMetadata
+  userId: string | mongoose.Types.ObjectId,
+  resourceData: { title: string; description: string; category: string; year: string; branch: string },
+  fileData: { publicId: string; secureUrl: string; fileType: string; fileSize: number }
 ) => {
   return resourceRequestRepository.createRequest({
     title: resourceData.title,
     description: resourceData.description,
     category: resourceData.category,
-    file: fileMetadata,
-    uploadedBy: uploaderId,
+    year: resourceData.year,
+    branch: resourceData.branch,
+    file: fileData,
+    uploadedBy: userId,
     status: 'pending'
   });
 };
 
 export const directUpload = async (
-  uploaderId: string | mongoose.Types.ObjectId,
-  resourceData: { title: string; description: string; category: string },
-  fileMetadata: IFileMetadata
+  userId: string | mongoose.Types.ObjectId,
+  resourceData: { title: string; description: string; category: string; year: string; branch: string },
+  fileData: { publicId: string; secureUrl: string; fileType: string; fileSize: number }
 ) => {
   return resourceRepository.createResource({
     title: resourceData.title,
     description: resourceData.description,
     category: resourceData.category,
-    file: fileMetadata,
-    uploadedBy: uploaderId,
+    year: resourceData.year,
+    branch: resourceData.branch,
+    file: fileData,
+    uploadedBy: userId,
     likesCount: 0
   });
 };
@@ -46,6 +50,8 @@ export const getPaginatedResources = async (query: {
   limit: number;
   search?: string;
   category?: string;
+  year?: string;
+  branch?: string;
 }) => {
   const page = Math.max(1, query.page);
   const limit = Math.max(1, Math.min(100, query.limit));
@@ -55,6 +61,14 @@ export const getPaginatedResources = async (query: {
 
   if (query.category) {
     filter.category = query.category;
+  }
+
+  if (query.year) {
+    filter.year = query.year;
+  }
+
+  if (query.branch) {
+    filter.branch = query.branch;
   }
 
   if (query.search) {
@@ -169,6 +183,8 @@ export const approveRequest = async (requestId: string, adminId: string) => {
     title: requestDoc.title,
     description: requestDoc.description,
     category: requestDoc.category,
+    year: (requestDoc as any).year,
+    branch: (requestDoc as any).branch,
     file: requestDoc.file,
     uploadedBy: requestDoc.uploadedBy,
     likesCount: 0

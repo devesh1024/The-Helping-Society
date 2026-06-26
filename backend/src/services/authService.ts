@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import * as userRepository from '../repositories/userRepository';
 import * as refreshTokenRepository from '../repositories/refreshTokenRepository';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
@@ -102,6 +102,36 @@ export const registerContributor = async (contributorData: any) => {
   return user;
 };
 
+export const registerAlumni = async (alumniData: any) => {
+  const existingEmail = await userRepository.findByEmail(alumniData.email);
+  if (existingEmail) {
+    throw new Error('Email address is already registered.');
+  }
+
+  const hashedPassword = await bcrypt.hash(alumniData.password, 12);
+  const verificationToken = generateRandomToken();
+  const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+  const user = await userRepository.createUser({
+    ...alumniData,
+    password: hashedPassword,
+    role: 'alumni',
+    status: 'pendingVerification',
+    isEmailVerified: false,
+    emailVerificationToken: verificationToken,
+    emailVerificationTokenExpires: verificationTokenExpires
+  });
+
+  const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/verify-email?token=${verificationToken}`;
+  await sendEmail({
+    email: user.email,
+    subject: 'Verify your Alumni Account - The Helping Society',
+    html: `<p>Welcome, ${user.fullName}!</p><p>Please verify your alumni account by clicking the link below:</p><a href="${verificationLink}">${verificationLink}</a><p>Please note: after email verification, your account will require administrator approval before login is enabled.</p>`
+  });
+
+  return user;
+};
+
 export const verifyEmail = async (token: string) => {
   const user = await userRepository.findByVerificationToken(token);
   if (!user) {
@@ -115,7 +145,7 @@ export const verifyEmail = async (token: string) => {
   if (user.role === 'student') {
     user.status = 'active';
   } else {
-    // Faculty and Contributors transition to pendingApproval
+    // Faculty, Contributors and Alumni transition to pendingApproval
     user.status = 'pendingApproval';
   }
 

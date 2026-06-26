@@ -175,7 +175,7 @@ Regular Students
 
 Example:
 
-[0701cs231026@uecu.ac.in](mailto:0701cs231026@uecu.ac.in)
+[0701CS23XXXX@uecu.ac.in](mailto:0701CS23XXXX@uecu.ac.in)
 
 Diploma Students
 

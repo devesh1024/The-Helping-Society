@@ -22,7 +22,7 @@ export const RegisterStudentSchema = z.object({
   ),
   phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits').max(15),
   email: z.string().email('Invalid email address').regex(studentEmailRegex, {
-    message: 'Institutional email must match your registration number structure (e.g. 0701cs231026@uecu.ac.in).'
+    message: 'Institutional email must match your registration number structure (e.g. 0701CS23XXXX@uecu.ac.in).'
   }),
   password: z.string().min(8, 'Password must be at least 8 characters long')
 }).refine((data) => {
@@ -48,6 +48,23 @@ export const RegisterContributorSchema = z.object({
   organizationName: z.string().min(2, 'Organization name must be at least 2 characters long').max(100),
   roleInOrganization: z.string().min(2, 'Role must be at least 2 characters long').max(100),
   email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters long')
+});
+
+export const RegisterAlumniSchema = z.object({
+  fullName: z.string().min(2, 'Full name must be at least 2 characters long').max(100),
+  email: z.string().email('Invalid email address'),
+  phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits').max(15),
+  branch: branchEnum,
+  yearOfGraduation: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val),
+    z.number().int().min(2000).max(new Date().getFullYear() + 10)
+  ),
+  currentCompany: z.string().min(1, 'Current company is required').max(100),
+  currentRole: z.string().min(1, 'Current role is required').max(100),
+  linkedin: z.string().url('Invalid LinkedIn URL').regex(/^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/i, {
+    message: 'LinkedIn URL must be a valid profile link.'
+  }).optional().or(z.literal('')),
   password: z.string().min(8, 'Password must be at least 8 characters long')
 });
 

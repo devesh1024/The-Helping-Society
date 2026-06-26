@@ -5,7 +5,7 @@ export interface IUser extends Document {
   fullName: string;
   email: string;
   password?: string;
-  role: 'student' | 'faculty' | 'contributor' | 'admin';
+  role: 'student' | 'faculty' | 'contributor' | 'admin' | 'alumni';
   status: 'pendingVerification' | 'pendingApproval' | 'active' | 'disabled' | 'banned';
   isEmailVerified: boolean;
   emailVerificationToken?: string | null;
@@ -29,7 +29,7 @@ const BaseUserSchema = new Schema<IUser>({
   password: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['student', 'faculty', 'contributor', 'admin'], 
+    enum: ['student', 'faculty', 'contributor', 'admin', 'alumni'], 
     required: true 
   },
   status: {
@@ -47,8 +47,6 @@ const BaseUserSchema = new Schema<IUser>({
   discriminatorKey: 'role', 
   strict: true 
 });
-
-BaseUserSchema.index({ email: 1 });
 
 export const User = mongoose.model<IUser>('User', BaseUserSchema);
 
@@ -118,3 +116,34 @@ export interface IAdmin extends IUser {}
 const AdminSchema = new Schema<IAdmin>({});
 
 export const Admin = User.discriminator<IAdmin>('admin', AdminSchema);
+
+// Alumni Discriminator Interface
+export interface IAlumni extends IUser {
+  phoneNumber: string;
+  branch: 'cs' | 'ce' | 'ec' | 'ee' | 'me' | 'cm';
+  yearOfGraduation: number;
+  currentCompany: string;
+  currentRole: string;
+  linkedin?: string;
+}
+
+// Alumni Schema
+const AlumniSchema = new Schema<IAlumni>({
+  phoneNumber: { type: String, required: true },
+  branch: { type: String, enum: ['cs', 'ce', 'ec', 'ee', 'me', 'cm'], required: true },
+  yearOfGraduation: { type: Number, required: true },
+  currentCompany: { type: String, required: true },
+  currentRole: { type: String, required: true },
+  linkedin: {
+    type: String,
+    validate: {
+      validator: function(val?: string) {
+        if (!val) return true;
+        return /^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/i.test(val);
+      },
+      message: 'LinkedIn URL must be a valid profile link.'
+    }
+  }
+});
+
+export const Alumni = User.discriminator<IAlumni>('alumni', AlumniSchema);

@@ -46,7 +46,7 @@ export const createSupportRequest = async (
           title: 'Support Request Needs Approval',
           message: `A new support request "${request.title}" needs your approval.`,
           type: 'global',
-          recipientId: admin._id as mongoose.Types.ObjectId,
+          recipientId: admin._id.toString(),
           link: '/support'
         })
       );
@@ -226,7 +226,7 @@ export const approveRequest = async (id: string, adminId: string) => {
       title: 'Support Request Approved',
       message: `Your support request "${request.title}" has been approved.`,
       type: 'global',
-      recipientId: request.ownerId,
+      recipientId: request.ownerId.toString(),
       link: '/support'
     });
   } catch (err) {
@@ -262,7 +262,7 @@ export const rejectRequest = async (id: string, adminId: string) => {
       title: 'Support Request Rejected',
       message: `Your support request "${request.title}" has been rejected.`,
       type: 'global',
-      recipientId: request.ownerId,
+      recipientId: request.ownerId.toString(),
       link: '/support'
     });
   } catch (err) {
@@ -299,7 +299,7 @@ export const resolveRequest = async (
       title: 'Support Request Resolved',
       message: `Your support request "${request.title}" has been resolved.`,
       type: 'global',
-      recipientId: request.ownerId,
+      recipientId: request.ownerId.toString(),
       link: '/support'
     });
   } catch (err) {
@@ -339,7 +339,7 @@ export const createSupportReply = async (
         title: 'New Reply on Support Request',
         message: `An administrator has replied to your request: "${request.title}"`,
         type: 'reply',
-        recipientId: request.ownerId,
+        recipientId: request.ownerId.toString(),
         link: '/support'
       });
     } else {
@@ -350,7 +350,7 @@ export const createSupportReply = async (
           title: 'New Reply on Support Request',
           message: `User replied to support request: "${request.title}"`,
           type: 'reply',
-          recipientId: admin._id as mongoose.Types.ObjectId,
+          recipientId: admin._id.toString(),
           link: '/support'
         })
       );

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  backend-app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend-app
+    restart: unless-stopped
+    expose:
+      - "5000"
+    env_file:
+      - ./backend/.env
+    networks:
+      - app-network
+    # No ports exposed to the host system for network isolation
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/api/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  frontend-app:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+    container_name: frontend-app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend-app:
+        condition: service_healthy
+    volumes:
+      # Mount development Nginx configuration over the container config
+      - ./nginx/default.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  app-network:
+    driver: bridge

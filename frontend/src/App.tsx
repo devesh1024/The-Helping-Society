@@ -14,6 +14,7 @@ import Opportunities from "./pages/Opportunities.tsx";
 import Community from "./pages/Community.tsx";
 import Support from "./pages/Support.tsx";
 import Admin from "./pages/Admin.tsx";
+import Legal from "./pages/Legal.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,8 @@ const App = () => (
             <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
             <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
+            <Route path="/legal" element={<Legal />} />
+            <Route path="/legal/:docId" element={<Legal />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

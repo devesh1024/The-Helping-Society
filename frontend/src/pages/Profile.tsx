@@ -22,6 +22,10 @@ export default function Profile() {
     dob: "",
     organizationName: "",
     roleInOrganization: "",
+    yearOfGraduation: "" as any,
+    currentCompany: "",
+    currentRole: "",
+    linkedin: "",
   });
 
   useEffect(() => {
@@ -34,6 +38,10 @@ export default function Profile() {
         dob: profile.dob || "",
         organizationName: profile.organizationName || "",
         roleInOrganization: profile.roleInOrganization || "",
+        yearOfGraduation: profile.yearOfGraduation ?? "",
+        currentCompany: profile.currentCompany || "",
+        currentRole: profile.currentRole || "",
+        linkedin: profile.linkedin || "",
       });
     }
   }, [profile]);
@@ -112,6 +120,62 @@ export default function Profile() {
         }
         payload.organizationName = form.organizationName;
         payload.roleInOrganization = form.roleInOrganization;
+      } else if (profile.user_type === "alumni") {
+        if (!form.fullName || form.fullName.trim().length < 2) {
+          toast.error("Full name must be at least 2 characters long");
+          setSaving(false);
+          return;
+        }
+        if (!form.phoneNumber || form.phoneNumber.trim().length < 10) {
+          toast.error("Phone number must be at least 10 digits");
+          setSaving(false);
+          return;
+        }
+        if (!form.branch) {
+          toast.error("Please select your branch");
+          setSaving(false);
+          return;
+        }
+        if (!form.yearOfGraduation) {
+          toast.error("Please enter your graduation year");
+          setSaving(false);
+          return;
+        }
+        if (!form.currentCompany || form.currentCompany.trim().length < 1) {
+          toast.error("Current company is required");
+          setSaving(false);
+          return;
+        }
+        if (!form.currentRole || form.currentRole.trim().length < 1) {
+          toast.error("Current role is required");
+          setSaving(false);
+          return;
+        }
+        if (form.linkedin) {
+          const isUrl = /^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/i.test(form.linkedin);
+          if (!isUrl) {
+            toast.error("Invalid LinkedIn URL");
+            setSaving(false);
+            return;
+          }
+        }
+
+        const revMap: Record<string, string> = {
+          "Computer Science Engineering": "cs",
+          "Electronics and communication engineering": "ec",
+          "Electrical Engineering": "ee",
+          "Chemical Engineering": "cm",
+          "Mechanical engineering": "me",
+          "Civil Engineering": "ce",
+        };
+        const branchCode = revMap[form.branch] || form.branch;
+
+        payload.phoneNumber = form.phoneNumber;
+        payload.branch = branchCode;
+        payload.yearOfGraduation = Number(form.yearOfGraduation);
+        payload.currentCompany = form.currentCompany;
+        payload.currentRole = form.currentRole;
+        payload.linkedin = form.linkedin || undefined;
       } else if (profile.user_type === "admin") {
         if (!form.fullName || form.fullName.trim().length < 2) {
           toast.error("Full name must be at least 2 characters long");
@@ -139,6 +203,7 @@ export default function Profile() {
     faculty: "Faculty",
     contributor: "Contributor",
     admin: "Administrator",
+    alumni: "Alumni",
   };
 
   return (
@@ -226,6 +291,45 @@ export default function Profile() {
                 <div>
                   <Label>Role in Organization</Label>
                   <Input value={form.roleInOrganization} onChange={(e) => setForm({ ...form, roleInOrganization: e.target.value })} />
+                </div>
+              </>
+            )}
+
+            {profile.user_type === "alumni" && (
+              <>
+                <div>
+                  <Label>Mobile Number</Label>
+                  <Input value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Branch</Label>
+                  <Select value={form.branch} onValueChange={(v) => setForm({ ...form, branch: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Computer Science Engineering">Computer Science Engineering</SelectItem>
+                      <SelectItem value="Electronics and communication engineering">Electronics and communication engineering</SelectItem>
+                      <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                      <SelectItem value="Chemical Engineering">Chemical Engineering</SelectItem>
+                      <SelectItem value="Mechanical engineering">Mechanical engineering</SelectItem>
+                      <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Year of Graduation</Label>
+                  <Input type="number" placeholder="e.g. 2022" value={form.yearOfGraduation} onChange={(e) => setForm({ ...form, yearOfGraduation: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Current Company</Label>
+                  <Input placeholder="e.g. Microsoft" value={form.currentCompany} onChange={(e) => setForm({ ...form, currentCompany: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Current Role</Label>
+                  <Input placeholder="e.g. Software Engineer" value={form.currentRole} onChange={(e) => setForm({ ...form, currentRole: e.target.value })} />
+                </div>
+                <div>
+                  <Label>LinkedIn Profile</Label>
+                  <Input placeholder="e.g. https://linkedin.com/in/username" value={form.linkedin} onChange={(e) => setForm({ ...form, linkedin: e.target.value })} />
                 </div>
               </>
             )}

@@ -9,7 +9,7 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
     }
 
     const validatedData = UpdateProfileSchema.parse(req.body);
-    const updatedUser = await userService.updateProfile(req.user._id, validatedData);
+    const updatedUser = await userService.updateProfile(req.user._id.toString(), validatedData);
 
     return res.status(200).json({
       success: true,

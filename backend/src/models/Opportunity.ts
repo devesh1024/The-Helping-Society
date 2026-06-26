@@ -16,6 +16,7 @@ export interface IOpportunity extends Document {
   conductedBy?: string;
   mode?: string;
   workType?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 const OpportunitySchema = new Schema<IOpportunity>({
@@ -46,10 +47,16 @@ const OpportunitySchema = new Schema<IOpportunity>({
   eventAt: { type: Date },
   conductedBy: { type: String, trim: true },
   mode: { type: String, trim: true },
-  workType: { type: String, trim: true }
+  workType: { type: String, trim: true },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved'
+  }
 }, { timestamps: true });
 
 OpportunitySchema.index({ type: 1 });
+OpportunitySchema.index({ approvalStatus: 1 });
 OpportunitySchema.index({ createdBy: 1 });
 OpportunitySchema.index({ createdAt: -1 });
 

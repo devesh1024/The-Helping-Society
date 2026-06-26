@@ -163,7 +163,9 @@ describe('Resources Hub Module Tests', () => {
         .attach('file', Buffer.from('PDF Content Dummy'), 'document.pdf')
         .field('title', 'Advanced Calculus')
         .field('description', 'Calculus notes by Prof. Dave')
-        .field('category', 'notes');
+        .field('category', 'notes')
+        .field('year', '1st year')
+        .field('branch', 'Computer Science and Engineering');
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -184,7 +186,9 @@ describe('Resources Hub Module Tests', () => {
         .attach('file', Buffer.from('PPT Content Dummy'), 'slides.ppt')
         .field('title', 'Compiler Design Slides')
         .field('description', 'Lecture slides for CD course')
-        .field('category', 'syllabus');
+        .field('category', 'syllabus')
+        .field('year', '3rd year')
+        .field('branch', 'Computer Science and Engineering');
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -216,6 +220,8 @@ describe('Resources Hub Module Tests', () => {
         title: 'Mock Book',
         description: 'Mock Book Description',
         category: 'books',
+        year: '1st year',
+        branch: 'Computer Science and Engineering',
         file: {
           publicId: 'mock_pub',
           secureUrl: 'https://cloudinary.com/mock.pdf',
@@ -262,6 +268,8 @@ describe('Resources Hub Module Tests', () => {
         title: 'Calculus PYQ',
         description: 'Last 5 years papers',
         category: 'pyqs',
+        year: '1st year',
+        branch: 'Computer Science and Engineering',
         file: {
           publicId: 'calc_pyq',
           secureUrl: 'https://cloudinary.com/calc.pdf',
@@ -322,6 +330,8 @@ describe('Resources Hub Module Tests', () => {
         title: 'Mock Study Material',
         description: 'Material description',
         category: 'study_material',
+        year: '2nd year',
+        branch: 'Computer Science and Engineering',
         file: {
           publicId: 'mat_pub',
           secureUrl: 'https://cloudinary.com/mat.pdf',

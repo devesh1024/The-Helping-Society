@@ -18,7 +18,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"registrationNumber\": \"0701cs231026\",\n  \"branch\": \"cs\",\n  \"yearOfRegistration\": 2023,\n  \"dob\": \"2003-05-15\",\n  \"phoneNumber\": \"9876543210\",\n  \"email\": \"0701cs231026@uecu.ac.in\",\n  \"password\": \"Password123\"\n}"
+              "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"registrationNumber\": \"0701cs230000\",\n  \"branch\": \"cs\",\n  \"yearOfRegistration\": 2023,\n  \"dob\": \"2003-05-15\",\n  \"phoneNumber\": \"9876543210\",\n  \"email\": \"0701cs230000@uecu.ac.in\",\n  \"password\": \"Password123\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register/student",
@@ -87,7 +87,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"0701cs231026@uecu.ac.in\",\n  \"password\": \"Password123\"\n}"
+              "raw": "{\n  \"email\": \"0701cs230000@uecu.ac.in\",\n  \"password\": \"Password123\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
@@ -152,7 +152,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"0701cs231026@uecu.ac.in\"\n}"
+              "raw": "{\n  \"email\": \"0701cs230000@uecu.ac.in\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/forgot-password",

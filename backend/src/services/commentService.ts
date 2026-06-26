@@ -51,7 +51,7 @@ export const createComment = async (
         title: 'New Reply on Your Post',
         message: `Someone replied to your post: ${targetTitle}`,
         type: 'comment',
-        recipientId,
+        recipientId: recipientId.toString(),
         link: targetType === 'resource' ? `/resources` : `/community`
       });
     }
@@ -93,7 +93,7 @@ export const createReply = async (
         title: 'New Reply to Your Comment',
         message: `Someone replied to your comment: "${parentComment.content.substring(0, 30)}..."`,
         type: 'reply',
-        recipientId: parentComment.ownerId,
+        recipientId: parentComment.ownerId.toString(),
         link: parentComment.targetType === 'resource' ? '/resources' : '/community'
       });
     }

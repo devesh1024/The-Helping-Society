@@ -4,6 +4,8 @@ export interface IResourceRequest extends Document {
   title: string;
   description: string;
   category: 'notes' | 'pyqs' | 'books' | 'syllabus' | 'study_material';
+  year: '1st year' | '2nd year' | '3rd year' | '4th year';
+  branch: 'Computer Science and Engineering' | 'Electronic and Communication Engineering' | 'Electrical Engineering' | 'Mechanical Engineering' | 'Civil Engineering' | 'Chemical Engineering';
   file: {
     publicId: string;
     secureUrl: string;
@@ -24,6 +26,23 @@ const ResourceRequestSchema = new Schema<IResourceRequest>({
     enum: ['notes', 'pyqs', 'books', 'syllabus', 'study_material'], 
     required: true 
   },
+  year: {
+    type: String,
+    enum: ['1st year', '2nd year', '3rd year', '4th year'],
+    required: true
+  },
+  branch: {
+    type: String,
+    enum: [
+      'Computer Science and Engineering',
+      'Electronic and Communication Engineering',
+      'Electrical Engineering',
+      'Mechanical Engineering',
+      'Civil Engineering',
+      'Chemical Engineering'
+    ],
+    required: true
+  },
   file: {
     publicId: { type: String, required: true },
     secureUrl: { type: String, required: true },
@@ -43,6 +62,8 @@ const ResourceRequestSchema = new Schema<IResourceRequest>({
 }, { timestamps: true });
 
 ResourceRequestSchema.index({ status: 1 });
+ResourceRequestSchema.index({ year: 1 });
+ResourceRequestSchema.index({ branch: 1 });
 ResourceRequestSchema.index({ uploadedBy: 1 });
 
 export const ResourceRequest = mongoose.model<IResourceRequest>('ResourceRequest', ResourceRequestSchema);

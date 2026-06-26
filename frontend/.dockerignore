@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+.env.production
+.git
+.gitignore
+tests
+vitest.config.ts
+*.md
+npm-debug.log
+.eslint.config.js
+postcss.config.js
+tailwind.config.ts
+tsconfig.json
+vite.config.ts

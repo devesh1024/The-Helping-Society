@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const UpdateRoleSchema = z.object({
-  role: z.enum(['student', 'faculty', 'contributor', 'admin'], {
-    errorMap: () => ({ message: "Role must be one of 'student', 'faculty', 'contributor', or 'admin'" })
+  role: z.enum(['student', 'faculty', 'contributor', 'admin', 'alumni'], {
+    errorMap: () => ({ message: "Role must be one of 'student', 'faculty', 'contributor', 'admin', or 'alumni'" })
   })
 });
 

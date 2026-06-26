@@ -5,7 +5,7 @@ import { sanitizeMiddleware } from '../middleware/sanitizeMiddleware';
 
 const router = Router();
 
-const generalRoles = ['student', 'coreTeam', 'faculty', 'admin'];
+const generalRoles = ['student', 'coreTeam', 'faculty', 'admin', 'alumni'];
 
 // Create support request
 router.post(

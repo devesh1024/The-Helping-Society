@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import * as opportunityRepository from '../repositories/opportunityRepository';
 import { IOpportunity } from '../models/Opportunity';
 import { createNotification } from './notificationService';
+import { AuditLog } from '../models/AuditLog';
 
 export const createOpportunity = async (
   createdBy: string | mongoose.Types.ObjectId,
@@ -18,6 +19,7 @@ export const createOpportunity = async (
     conductedBy?: string;
     mode?: string;
     workType?: string;
+    approvalStatus?: 'pending' | 'approved' | 'rejected';
   }
 ): Promise<IOpportunity> => {
   const opp = await opportunityRepository.createOpportunity({
@@ -25,17 +27,19 @@ export const createOpportunity = async (
     createdBy
   });
 
-  // Trigger a global notification for the new opportunity
-  try {
-    await createNotification({
-      title: 'New Opportunity Posted',
-      message: `A new ${opp.type} opportunity "${opp.title}" has been posted.`,
-      type: 'opportunityPosted',
-      recipientId: null,
-      link: '/opportunities'
-    });
-  } catch (err) {
-    console.error('Failed to trigger opportunity notification:', err);
+  // Only trigger a global notification for the new opportunity if approved immediately
+  if (opp.approvalStatus === 'approved') {
+    try {
+      await createNotification({
+        title: 'New Opportunity Posted',
+        message: `A new ${opp.type} opportunity "${opp.title}" has been posted.`,
+        type: 'opportunityPosted',
+        recipientId: null,
+        link: '/opportunities'
+      });
+    } catch (err) {
+      console.error('Failed to trigger opportunity notification:', err);
+    }
   }
 
   return opp;
@@ -46,6 +50,8 @@ export const getOpportunities = async (query: {
   limit: number;
   type?: string;
   search?: string;
+  userId?: string;
+  role?: string;
 }) => {
   const page = query.page || 1;
   const limit = query.limit || 10;
@@ -53,15 +59,46 @@ export const getOpportunities = async (query: {
 
   const filter: any = {};
 
-  if (query.type) {
-    filter.type = query.type;
-  }
+  // Build filters:
+  // Approved opportunities are visible to all. Pending/rejected are visible only to their creators.
+  if (query.userId) {
+    const visibilityFilter = {
+      $or: [
+        { approvalStatus: 'approved' },
+        { createdBy: query.userId }
+      ]
+    };
+    const clauses: any[] = [visibilityFilter];
 
-  if (query.search) {
-    filter.$or = [
-      { title: { $regex: query.search, $options: 'i' } },
-      { description: { $regex: query.search, $options: 'i' } }
-    ];
+    if (query.type) {
+      clauses.push({ type: query.type });
+    }
+
+    if (query.search) {
+      clauses.push({
+        $or: [
+          { title: { $regex: query.search, $options: 'i' } },
+          { description: { $regex: query.search, $options: 'i' } }
+        ]
+      });
+    }
+
+    if (clauses.length > 1) {
+      filter.$and = clauses;
+    } else {
+      Object.assign(filter, clauses[0]);
+    }
+  } else {
+    filter.approvalStatus = 'approved';
+    if (query.type) {
+      filter.type = query.type;
+    }
+    if (query.search) {
+      filter.$or = [
+        { title: { $regex: query.search, $options: 'i' } },
+        { description: { $regex: query.search, $options: 'i' } }
+      ];
+    }
   }
 
   const opportunities = await opportunityRepository.findOpportunitiesPaginated(filter, skip, limit);
@@ -108,4 +145,76 @@ export const deleteOpportunity = async (id: string): Promise<void> => {
   if (!opportunity) {
     throw new Error('Opportunity not found.');
   }
+};
+
+export const getOpportunityRequests = async (query: { page: number; limit: number }) => {
+  const page = query.page || 1;
+  const limit = query.limit || 10;
+  const skip = (page - 1) * limit;
+
+  const filter = { approvalStatus: 'pending' };
+  const opportunities = await opportunityRepository.findOpportunitiesPaginated(filter, skip, limit);
+  const total = await opportunityRepository.countOpportunities(filter);
+  const totalPages = Math.ceil(total / limit);
+
+  return { opportunities, total, page, limit, totalPages };
+};
+
+export const approveOpportunity = async (id: string, adminId: string): Promise<IOpportunity> => {
+  const opp = await opportunityRepository.findOpportunityById(id);
+  if (!opp) {
+    throw new Error('Opportunity not found.');
+  }
+  if (opp.approvalStatus !== 'pending') {
+    throw new Error(`Opportunity request is already ${opp.approvalStatus}.`);
+  }
+
+  opp.approvalStatus = 'approved';
+  await opp.save();
+
+  // Trigger a global notification for the approved opportunity
+  try {
+    await createNotification({
+      title: 'New Opportunity Posted',
+      message: `A new ${opp.type} opportunity "${opp.title}" has been posted.`,
+      type: 'opportunityPosted',
+      recipientId: null,
+      link: '/opportunities'
+    });
+  } catch (err) {
+    console.error('Failed to trigger opportunity notification:', err);
+  }
+
+  // Log in AuditLog
+  await AuditLog.create({
+    actorId: adminId,
+    action: 'approval',
+    targetId: opp._id,
+    details: `Approved opportunity request: "${opp.title}".`
+  });
+
+  return opp;
+};
+
+export const rejectOpportunity = async (id: string, adminId: string): Promise<IOpportunity> => {
+  const opp = await opportunityRepository.findOpportunityById(id);
+  if (!opp) {
+    throw new Error('Opportunity not found.');
+  }
+  if (opp.approvalStatus !== 'pending') {
+    throw new Error(`Opportunity request is already ${opp.approvalStatus}.`);
+  }
+
+  opp.approvalStatus = 'rejected';
+  await opp.save();
+
+  // Log in AuditLog
+  await AuditLog.create({
+    actorId: adminId,
+    action: 'rejection',
+    targetId: opp._id,
+    details: `Rejected opportunity request: "${opp.title}".`
+  });
+
+  return opp;
 };

@@ -20,6 +20,7 @@ interface Opportunity {
   category: string; type: string; location: string | null; deadline: string | null;
   status: "open" | "closed"; created_at: string; created_by: string;
   event_at?: string | null; conducted_by?: string | null; mode?: string | null;
+  approvalStatus: "pending" | "approved" | "rejected";
 }
 
 const TYPE_OPTIONS = ["Part-time", "Full Time", "Remote", "Hybrid"];
@@ -41,6 +42,7 @@ const mapBackendToFrontend = (opp: any): Opportunity => ({
   event_at: opp.eventAt || null,
   conducted_by: opp.conductedBy || null,
   mode: opp.mode || null,
+  approvalStatus: opp.approvalStatus || "approved",
 });
 
 export default function Opportunities() {
@@ -84,8 +86,10 @@ export default function Opportunities() {
             </h1>
             <p className="text-muted-foreground mt-1">Curated jobs, internships and workshops, posted by Khabri admins.</p>
           </div>
-          {(isKhabri && isAdmin) && (
-            <Button variant="hero" onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Post opportunity</Button>
+          {(isAdmin || isKhabri || user?.role === "student") && (
+            <Button variant="hero" onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4" /> {user?.role === "student" ? "Request to Upload" : "Post opportunity"}
+            </Button>
           )}
         </div>
 
@@ -108,7 +112,12 @@ export default function Opportunities() {
                       <h3 className="font-display font-bold text-xl mt-1">{o.role}</h3>
                       <p className="text-sm text-muted-foreground">{isWorkshop ? (o.conducted_by || o.company) : o.company}</p>
                     </div>
-                    <Badge variant={o.status === "open" ? "default" : "secondary"}>{o.status}</Badge>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <Badge variant={o.status === "open" ? "default" : "secondary"}>{o.status}</Badge>
+                      {o.approvalStatus === "pending" && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-500 bg-amber-500/10">Pending Approval</Badge>
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm mt-3 line-clamp-3">{o.description}</p>
                   <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground">
@@ -122,7 +131,7 @@ export default function Opportunities() {
                     <Button asChild variant="hero" size="sm" className="flex-1">
                       <a href={o.apply_url} target="_blank" rel="noopener noreferrer">{isWorkshop ? "Register" : "Apply"} <ExternalLink className="h-3.5 w-3.5" /></a>
                     </Button>
-                    {((isKhabri && isAdmin && o.created_by === user?.id) || isAdmin) && (
+                    {((o.created_by === user?.id) || isAdmin) && (
                       <Button variant="outline" size="icon" onClick={() => remove(o.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     )}
                   </div>
@@ -192,7 +201,7 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
     setBusy(true);
     try {
       await api.post("/opportunities", payload);
-      toast.success("Posted"); 
+      toast.success(user?.role === "student" ? "Request submitted successfully" : "Posted"); 
       onOpenChange(false); 
       onCreated();
       setForm({ company:"", role:"", description:"", apply_url:"", type:"Full Time", location:"", deadline:"", title:"", conducted_by:"", event_at:"", mode:"Online" });
@@ -207,8 +216,12 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New opportunity</DialogTitle>
-          <DialogDescription className="sr-only">Fill in the details to post a new opportunity.</DialogDescription>
+          <DialogTitle>{user?.role === "student" ? "Request Opportunity Upload" : "New opportunity"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {user?.role === "student" 
+              ? "Fill in the details to request a new opportunity upload." 
+              : "Fill in the details to post a new opportunity."}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
@@ -265,7 +278,9 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
           <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})}/></div>
           <div><Label>{category === "Workshop" ? "Register link" : "Apply URL"}</Label><Input value={form.apply_url} onChange={(e)=>setForm({...form,apply_url:e.target.value})} placeholder="https://..."/></div>
 
-          <Button variant="hero" className="w-full" onClick={submit} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Publish"}</Button>
+          <Button variant="hero" className="w-full" onClick={submit} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : (user?.role === "student" ? "Submit Request" : "Publish")}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

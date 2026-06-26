@@ -17,7 +17,7 @@ export default function Index() {
   const { user, isVerified } = useAuth();
 
   return (
-    <Layout>
+    <Layout style={{ zoom: 1.1 }}>
       {/* HERO */}
       <section className="relative overflow-hidden bg-gradient-hero">
         <div className="container py-20 md:py-32 relative">
@@ -69,12 +69,14 @@ export default function Index() {
 
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }}
-            className="hidden lg:block absolute right-0 top-20 h-[400px] w-[400px]"
+            className="hidden lg:block absolute right-12 top-10 h-[500px] w-[500px]"
           >
-            <div className="absolute inset-0 bg-gradient-primary rounded-full blur-3xl opacity-30 animate-float" />
-            <Logo className="absolute inset-0 m-auto h-64 w-64 animate-float" />
+            <div className="absolute inset-0 bg-gradient-primary rounded-full blur-3xl opacity-35 animate-float" />
+            <Logo className="absolute inset-0 m-auto h-96 w-96 animate-float" />
           </motion.div>
         </div>
+        {/* Fade overlay to blend hero section into the next section */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
       </section>
 
       {/* MODULES */}

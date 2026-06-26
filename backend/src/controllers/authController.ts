@@ -4,6 +4,7 @@ import {
   RegisterStudentSchema, 
   RegisterFacultySchema, 
   RegisterContributorSchema, 
+  RegisterAlumniSchema,
   LoginSchema, 
   ForgotPasswordSchema, 
   ResetPasswordSchema 
@@ -86,6 +87,30 @@ export const registerContributor = async (req: Request, res: Response, next: Nex
   try {
     const validatedData = RegisterContributorSchema.parse(req.body);
     await authService.registerContributor(validatedData);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Verification email sent. Account requires admin approval after verification.'
+    });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation Failed',
+        errors: error.errors
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Registration failed.'
+    });
+  }
+};
+
+export const registerAlumni = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validatedData = RegisterAlumniSchema.parse(req.body);
+    await authService.registerAlumni(validatedData);
 
     return res.status(201).json({
       success: true,

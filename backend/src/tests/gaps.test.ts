@@ -73,7 +73,7 @@ describe('Backend Contract Gaps Resolution Tests', () => {
       phoneNumber: '9876543200'
     });
     studentId = student._id as mongoose.Types.ObjectId;
-    tokenStudent = signAccessToken({ id: studentId.toString(), role: 'student', email: student.email });
+    tokenStudent = signAccessToken({ id: studentId.toString(), role: 'student', email: student.email, isCoreTeam: false });
 
     // Create Contributor A
     const contributor = await User.create({
@@ -87,7 +87,7 @@ describe('Backend Contract Gaps Resolution Tests', () => {
       roleInOrganization: 'Lead'
     });
     contributorId = contributor._id as mongoose.Types.ObjectId;
-    tokenContributor = signAccessToken({ id: contributorId.toString(), role: 'contributor', email: contributor.email });
+    tokenContributor = signAccessToken({ id: contributorId.toString(), role: 'contributor', email: contributor.email, isCoreTeam: false });
 
     // Create Contributor B
     const otherContributor = await User.create({
@@ -101,7 +101,7 @@ describe('Backend Contract Gaps Resolution Tests', () => {
       roleInOrganization: 'Staff'
     });
     otherContributorId = otherContributor._id as mongoose.Types.ObjectId;
-    tokenOtherContributor = signAccessToken({ id: otherContributorId.toString(), role: 'contributor', email: otherContributor.email });
+    tokenOtherContributor = signAccessToken({ id: otherContributorId.toString(), role: 'contributor', email: otherContributor.email, isCoreTeam: false });
 
     // Create Admin
     const admin = await User.create({
@@ -113,7 +113,7 @@ describe('Backend Contract Gaps Resolution Tests', () => {
       isEmailVerified: true
     });
     adminId = admin._id as mongoose.Types.ObjectId;
-    tokenAdmin = signAccessToken({ id: adminId.toString(), role: 'admin', email: admin.email });
+    tokenAdmin = signAccessToken({ id: adminId.toString(), role: 'admin', email: admin.email, isCoreTeam: true });
   });
 
   // ==========================================
@@ -136,7 +136,7 @@ describe('Backend Contract Gaps Resolution Tests', () => {
       expect(res.body.data.opportunity.title).toBe('Internship Role');
     });
 
-    it('should reject opportunity creation from students', async () => {
+    it('should allow student to submit an opportunity request (pending approval)', async () => {
       const res = await request(testApp)
         .post('/api/v1/opportunities')
         .set('Authorization', `Bearer ${tokenStudent}`)
@@ -147,8 +147,47 @@ describe('Backend Contract Gaps Resolution Tests', () => {
           link: 'https://intern.com/apply'
         });
 
-      expect(res.status).toBe(403);
-      expect(res.body.success).toBe(false);
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.opportunity.approvalStatus).toBe('pending');
+    });
+
+    it('should allow admin to approve opportunity request', async () => {
+      const opp = await Opportunity.create({
+        title: 'Pending Opportunity',
+        description: 'Details for pending opportunity',
+        type: 'internship',
+        link: 'https://intern.com/apply',
+        createdBy: studentId,
+        approvalStatus: 'pending'
+      });
+
+      const res = await request(testApp)
+        .patch(`/api/v1/opportunity-requests/${opp._id}/approve`)
+        .set('Authorization', `Bearer ${tokenAdmin}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.opportunity.approvalStatus).toBe('approved');
+    });
+
+    it('should allow admin to reject opportunity request', async () => {
+      const opp = await Opportunity.create({
+        title: 'Pending Opportunity 2',
+        description: 'Details for pending opportunity 2',
+        type: 'internship',
+        link: 'https://intern.com/apply',
+        createdBy: studentId,
+        approvalStatus: 'pending'
+      });
+
+      const res = await request(testApp)
+        .patch(`/api/v1/opportunity-requests/${opp._id}/reject`)
+        .set('Authorization', `Bearer ${tokenAdmin}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.opportunity.approvalStatus).toBe('rejected');
     });
 
     it('should allow all users to retrieve opportunities', async () => {

@@ -5,7 +5,7 @@ export const createOpportunity = async (data: any): Promise<IOpportunity> => {
 };
 
 export const findOpportunityById = async (id: string): Promise<IOpportunity | null> => {
-  return Opportunity.findById(id).exec();
+  return Opportunity.findById(id).populate('createdBy', 'fullName role').exec();
 };
 
 export const findOpportunitiesPaginated = async (
@@ -14,6 +14,7 @@ export const findOpportunitiesPaginated = async (
   limit: number
 ): Promise<IOpportunity[]> => {
   return Opportunity.find(filter)
+    .populate('createdBy', 'fullName role')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)

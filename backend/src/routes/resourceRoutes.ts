@@ -7,11 +7,11 @@ import { sanitizeMiddleware } from '../middleware/sanitizeMiddleware';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Student / Core Team submit upload request
+// Student / Core Team / Alumni submit upload request
 router.post(
   '/resources/request',
   authenticateUser,
-  authorizeRoles('student', 'coreTeam'),
+  authorizeRoles('student', 'coreTeam', 'alumni'),
   sanitizeMiddleware,
   upload.single('file'),
   resourceController.submitUploadRequest
@@ -31,14 +31,14 @@ router.post(
 router.get(
   '/resources',
   authenticateUser,
-  authorizeRoles('student', 'coreTeam', 'faculty', 'admin'),
+  authorizeRoles('student', 'coreTeam', 'faculty', 'admin', 'alumni'),
   resourceController.getResources
 );
 
 router.get(
   '/resources/:id',
   authenticateUser,
-  authorizeRoles('student', 'coreTeam', 'faculty', 'admin'),
+  authorizeRoles('student', 'coreTeam', 'faculty', 'admin', 'alumni'),
   resourceController.getResourceById
 );
 
@@ -46,7 +46,7 @@ router.get(
 router.put(
   '/resources/:id',
   authenticateUser,
-  authorizeRoles('student', 'coreTeam', 'faculty', 'admin'),
+  authorizeRoles('student', 'coreTeam', 'faculty', 'admin', 'alumni'),
   authorizeOwnership('Resource', 'id'),
   resourceController.updateResource
 );
@@ -54,7 +54,7 @@ router.put(
 router.delete(
   '/resources/:id',
   authenticateUser,
-  authorizeRoles('student', 'coreTeam', 'faculty', 'admin'),
+  authorizeRoles('student', 'coreTeam', 'faculty', 'admin', 'alumni'),
   authorizeOwnership('Resource', 'id'),
   resourceController.deleteResource
 );
@@ -63,7 +63,7 @@ router.delete(
 router.post(
   '/resources/:id/like',
   authenticateUser,
-  authorizeRoles('student', 'coreTeam', 'faculty', 'admin'),
+  authorizeRoles('student', 'coreTeam', 'faculty', 'admin', 'alumni'),
   resourceController.toggleLike
 );
 

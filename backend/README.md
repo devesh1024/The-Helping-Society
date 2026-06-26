@@ -174,12 +174,12 @@ All backend endpoints are prefixed with `/api/v1`.
     ```json
     {
       "fullName": "Jane Doe",
-      "registrationNumber": "0701cs231026",
+      "registrationNumber": "0701CS23XXXX",
       "branch": "cs",
       "yearOfRegistration": 2023,
       "dob": "2003-05-15",
       "phoneNumber": "9876543210",
-      "email": "0701cs231026@uecu.ac.in",
+      "email": "0701CS23XXXX@uecu.ac.in",
       "password": "Password123"
     }
     ```
@@ -211,7 +211,7 @@ All backend endpoints are prefixed with `/api/v1`.
 *   **Request Body**:
     ```json
     {
-      "email": "0701cs231026@uecu.ac.in",
+      "email": "0701CS23XXXX@uecu.ac.in",
       "password": "Password123"
     }
     ```

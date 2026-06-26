@@ -11,7 +11,7 @@ import mongoose from 'mongoose';
 export const getDashboardStats = async () => {
   const totalUsers = await User.countDocuments({ status: 'active' });
   const pendingVerifications = await User.countDocuments({
-    role: { $in: ['faculty', 'contributor'] },
+    role: { $in: ['faculty', 'contributor', 'alumni'] },
     status: 'pendingApproval'
   });
   const totalResources = await Resource.countDocuments({});
@@ -167,7 +167,7 @@ export const getPendingApprovals = async (query: { page: number; limit: number }
   const skip = (page - 1) * limit;
 
   const filter = {
-    role: { $in: ['faculty', 'contributor'] },
+    role: { $in: ['faculty', 'contributor', 'alumni'] },
     status: 'pendingApproval'
   };
 

@@ -402,11 +402,12 @@ export const deleteMarketplace = async (req: Request, res: Response, next: NextF
 
 export const uploadImage = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.file) {
+    const file = (req as any).file;
+    if (!file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
     }
 
-    const result = await uploadImageBuffer(req.file.buffer);
+    const result = await uploadImageBuffer(file.buffer);
 
     return res.status(200).json({
       success: true,

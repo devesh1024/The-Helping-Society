@@ -32,17 +32,21 @@ export const submitUploadRequest = async (req: Request, res: Response, next: Nex
     const anyReq = req as any;
     validateUploadedFile(anyReq.file);
 
-    const { title, description, category } = req.body;
-    if (!title || !description || !category) {
-      return res.status(400).json({ success: false, message: 'Title, description, and category are required.' });
+    const { title, description, category, year, branch } = req.body;
+    if (!title || !description || !category || !year || !branch) {
+      return res.status(400).json({ success: false, message: 'Title, description, category, year, and branch are required.' });
     }
 
+    const yearFolder = year.toLowerCase().replace(/\s+/g, '_');
+    const branchFolder = branch.toLowerCase().replace(/\s+/g, '_');
+    const folderPath = `academic_resources/${yearFolder}/${branchFolder}`;
+
     // Stream file buffer to Cloudinary
-    const fileResult = await uploadBuffer(anyReq.file.buffer);
+    const fileResult = await uploadBuffer(anyReq.file.buffer, folderPath);
 
     const requestDoc = await resourceService.submitUploadRequest(
       req.user._id,
-      { title, description, category },
+      { title, description, category, year, branch },
       {
         publicId: fileResult.public_id,
         secureUrl: fileResult.secure_url,
@@ -73,17 +77,21 @@ export const directUpload = async (req: Request, res: Response, next: NextFuncti
     const anyReq = req as any;
     validateUploadedFile(anyReq.file);
 
-    const { title, description, category } = req.body;
-    if (!title || !description || !category) {
-      return res.status(400).json({ success: false, message: 'Title, description, and category are required.' });
+    const { title, description, category, year, branch } = req.body;
+    if (!title || !description || !category || !year || !branch) {
+      return res.status(400).json({ success: false, message: 'Title, description, category, year, and branch are required.' });
     }
 
+    const yearFolder = year.toLowerCase().replace(/\s+/g, '_');
+    const branchFolder = branch.toLowerCase().replace(/\s+/g, '_');
+    const folderPath = `academic_resources/${yearFolder}/${branchFolder}`;
+
     // Stream file buffer to Cloudinary
-    const fileResult = await uploadBuffer(anyReq.file.buffer);
+    const fileResult = await uploadBuffer(anyReq.file.buffer, folderPath);
 
     const resource = await resourceService.directUpload(
       req.user._id,
-      { title, description, category },
+      { title, description, category, year, branch },
       {
         publicId: fileResult.public_id,
         secureUrl: fileResult.secure_url,
@@ -111,12 +119,16 @@ export const getResources = async (req: Request, res: Response, next: NextFuncti
     const limit = parseInt(req.query.limit as string, 10) || 10;
     const search = req.query.search as string;
     const category = req.query.category as string;
+    const year = req.query.year as string;
+    const branch = req.query.branch as string;
 
     const result = await resourceService.getPaginatedResources({
       page,
       limit,
       search,
-      category
+      category,
+      year,
+      branch
     });
 
     return res.status(200).json({

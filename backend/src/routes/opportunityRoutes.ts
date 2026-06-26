@@ -5,8 +5,8 @@ import { sanitizeMiddleware } from '../middleware/sanitizeMiddleware';
 
 const router = Router();
 
-const generalRoles = ['student', 'coreTeam', 'faculty', 'contributor', 'admin'];
-const posterRoles = ['contributor', 'admin'];
+const generalRoles = ['student', 'coreTeam', 'faculty', 'contributor', 'admin', 'alumni'];
+const posterRoles = ['student', 'contributor', 'admin', 'alumni'];
 
 router.post(
   '/opportunities',
@@ -45,6 +45,28 @@ router.delete(
   authorizeRoles(...generalRoles),
   authorizeOwnership('Opportunity', 'id'),
   opportunityController.deleteOpportunity
+);
+
+// Admin-only opportunity request moderation
+router.get(
+  '/opportunity-requests',
+  authenticateUser,
+  authorizeRoles('admin'),
+  opportunityController.getOpportunityRequests
+);
+
+router.patch(
+  '/opportunity-requests/:id/approve',
+  authenticateUser,
+  authorizeRoles('admin'),
+  opportunityController.approveOpportunity
+);
+
+router.patch(
+  '/opportunity-requests/:id/reject',
+  authenticateUser,
+  authorizeRoles('admin'),
+  opportunityController.rejectOpportunity
 );
 
 export default router;

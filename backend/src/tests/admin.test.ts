@@ -133,6 +133,8 @@ describe('Admin Panel Module Tests', () => {
         title: 'Resource X',
         description: 'Desc',
         category: 'notes',
+        year: '1st year',
+        branch: 'Computer Science and Engineering',
         file: { publicId: 'a', secureUrl: 'http://a', fileType: 'pdf', fileSize: 100 },
         uploadedBy: studentAId
       });
@@ -141,6 +143,8 @@ describe('Admin Panel Module Tests', () => {
         title: 'Req X',
         description: 'Desc',
         category: 'notes',
+        year: '3rd year',
+        branch: 'Civil Engineering',
         file: { publicId: 'a', secureUrl: 'http://a', fileType: 'pdf', fileSize: 100 },
         uploadedBy: studentAId,
         status: 'pending'
@@ -194,7 +198,7 @@ describe('Admin Panel Module Tests', () => {
         .send({ role: 'admin' });
 
       expect(res.status).toBe(200);
-      
+
       const updated = await User.findById(studentAId);
       expect(updated?.role).toBe('admin');
 
@@ -254,7 +258,7 @@ describe('Admin Panel Module Tests', () => {
         .set('Authorization', `Bearer ${tokenAdmin}`);
 
       expect(res.status).toBe(200);
-      
+
       const updated = await User.findById(facultyId);
       expect(updated?.status).toBe('active');
 

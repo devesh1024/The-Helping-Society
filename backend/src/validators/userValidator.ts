@@ -16,5 +16,15 @@ export const UpdateProfileSchema = z.object({
   ),
   // Contributor-specific fields
   organizationName: z.string().min(2, 'Organization name must be at least 2 characters long').max(100).optional(),
-  roleInOrganization: z.string().min(2, 'Role in organization must be at least 2 characters long').max(100).optional()
+  roleInOrganization: z.string().min(2, 'Role in organization must be at least 2 characters long').max(100).optional(),
+  // Alumni-specific fields
+  yearOfGraduation: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val),
+    z.number().int().min(2000).max(new Date().getFullYear() + 10).optional()
+  ),
+  currentCompany: z.string().min(1, 'Current company cannot be empty').max(100).optional(),
+  currentRole: z.string().min(1, 'Current role cannot be empty').max(100).optional(),
+  linkedin: z.string().url('Invalid LinkedIn URL').regex(/^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/i, {
+    message: 'LinkedIn URL must be a valid profile link.'
+  }).optional().or(z.literal(''))
 });

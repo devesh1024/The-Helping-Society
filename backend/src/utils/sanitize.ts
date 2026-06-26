@@ -2,7 +2,7 @@ import createDOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 
 // Create a virtual window for DOMPurify
-const window = new JSDOM('').window as unknown as Window;
+const window = new JSDOM('').window as any;
 const DOMPurify = createDOMPurify(window);
 
 /**

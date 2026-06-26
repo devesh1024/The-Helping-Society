@@ -27,10 +27,12 @@ export default function Admin() {
           <TabsList>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
+            <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
             <TabsTrigger value="audit">Audit Log</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-6"><UsersPanel /></TabsContent>
           <TabsContent value="resources" className="mt-6"><ResourcesPanel /></TabsContent>
+          <TabsContent value="opportunities" className="mt-6"><OpportunitiesPanel /></TabsContent>
           <TabsContent value="audit" className="mt-6"><AuditPanel /></TabsContent>
         </Tabs>
       </div>
@@ -169,6 +171,7 @@ function UsersPanel() {
                     <SelectItem value="student">student</SelectItem>
                     <SelectItem value="faculty">faculty</SelectItem>
                     <SelectItem value="contributor">contributor</SelectItem>
+                    <SelectItem value="alumni">alumni</SelectItem>
                     <SelectItem value="admin">admin</SelectItem>
                   </SelectContent>
                 </Select>
@@ -365,6 +368,111 @@ function AuditPanel() {
         );
       })}
       {items.length === 0 && <Card className="p-8 text-center text-muted-foreground">No actions logged.</Card>}
+    </div>
+  );
+}
+
+function OpportunitiesPanel() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>("pending");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      let list: any[] = [];
+      if (filter === "pending" || filter === "rejected" || filter === "all") {
+        const response = await api.get(`/opportunity-requests?limit=100`);
+        const reqList = response.data?.data?.opportunities || [];
+        list = list.concat(reqList.map((o: any) => ({ ...o, id: o._id, isRequest: true })));
+      }
+      if (filter === "approved" || filter === "all") {
+        const response = await api.get("/opportunities?limit=100");
+        const docList = response.data?.data?.opportunities || [];
+        list = list.concat(docList.map((o: any) => ({ ...o, id: o._id, approvalStatus: "approved", isRequest: false })));
+      }
+
+      if (filter !== "all") {
+        list = list.filter(item => (item.approvalStatus || item.status) === filter);
+      }
+
+      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setItems(list);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to load opportunities");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, [filter]);
+
+  const setStatus = async (it: any, status: "approved" | "rejected") => {
+    try {
+      if (status === "approved") {
+        await api.patch(`/opportunity-requests/${it.id}/approve`);
+      } else {
+        await api.patch(`/opportunity-requests/${it.id}/reject`);
+      }
+      toast.success("Updated");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update request");
+    }
+  };
+
+  const remove = async (it: any) => {
+    if (!confirm("Delete?")) return;
+    try {
+      if (it.isRequest && it.approvalStatus === "pending") {
+        await api.patch(`/opportunity-requests/${it.id}/reject`);
+      } else {
+        await api.delete(`/opportunities/${it.id}`);
+      }
+      toast.success("Deleted");
+      load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete");
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        {["pending", "approved", "rejected", "all"].map((s) => (
+          <Button key={s} size="sm" variant={filter === s ? "hero" : "outline"} onClick={() => setFilter(s)}>{s}</Button>
+        ))}
+      </div>
+      {loading ? <div className="grid place-items-center py-10"><Loader2 className="animate-spin" /></div> :
+        <div className="space-y-3">
+          {items.map((o) => {
+            const studentName = typeof o.createdBy === "object" && o.createdBy !== null ? o.createdBy.fullName : "Unknown User";
+            const roleLabel = o.title;
+            const companyLabel = o.company || o.conductedBy || "—";
+            const approvalStatus = o.approvalStatus || o.status || "approved";
+            return (
+              <Card key={o.id} className="p-4 flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <p className="font-semibold">{roleLabel} at {companyLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Submitted by: <strong className="font-medium text-foreground">@{studentName}</strong> · Type: <span className="capitalize">{o.type}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{o.description}</p>
+                </div>
+                <Badge variant={approvalStatus === "approved" ? "default" : approvalStatus === "rejected" ? "destructive" : "outline"}>{approvalStatus}</Badge>
+                <div className="flex gap-1">
+                  {approvalStatus === "pending" && (
+                    <>
+                      <Button size="sm" variant="hero" onClick={() => setStatus(o, "approved")} title="Approve"><Check className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="outline" onClick={() => setStatus(o, "rejected")} title="Reject"><X className="h-3 w-3" /></Button>
+                    </>
+                  )}
+                  <Button size="sm" variant="destructive" onClick={() => remove(o)} title="Delete"><Trash2 className="h-3 w-3" /></Button>
+                </div>
+              </Card>
+            );
+          })}
+          {items.length === 0 && <Card className="p-8 text-center text-muted-foreground">Nothing here.</Card>}
+        </div>}
     </div>
   );
 }

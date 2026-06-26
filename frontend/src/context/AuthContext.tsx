@@ -9,7 +9,7 @@ export interface Profile {
   full_name: string;
   email: string;
   mobile_number: string | null;
-  user_type: "student" | "faculty" | "contributor" | "admin";
+  user_type: "student" | "faculty" | "contributor" | "admin" | "alumni";
   verified: boolean;
   is_disabled: boolean;
   is_banned: boolean;
@@ -25,6 +25,12 @@ export interface Profile {
   organizationName?: string;
   roleInOrganization?: string;
 
+  // Alumni fields
+  yearOfGraduation?: number;
+  currentCompany?: string;
+  currentRole?: string;
+  linkedin?: string;
+
   // Backward compatibility helper
   year?: number;
 }
@@ -32,7 +38,7 @@ export interface Profile {
 export interface AppUser {
   id: string;
   email: string;
-  role: 'student' | 'faculty' | 'contributor' | 'admin';
+  role: 'student' | 'faculty' | 'contributor' | 'admin' | 'alumni';
   fullName: string;
 }
 
@@ -91,6 +97,10 @@ const mapUserToProfile = (u: any): Profile | null => {
     isCoreTeam: u.isCoreTeam,
     organizationName: u.organizationName,
     roleInOrganization: u.roleInOrganization,
+    yearOfGraduation: u.yearOfGraduation,
+    currentCompany: u.currentCompany,
+    currentRole: u.currentRole,
+    linkedin: u.linkedin,
     year: computedYear || undefined,
   };
 };
@@ -129,6 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (u.role === 'faculty') {
         rolesList.push('user');
         at = 'professor';
+      } else if (u.role === 'alumni') {
+        rolesList.push('user');
       } else if (u.role === 'student') {
         rolesList.push('user');
         if (u.isCoreTeam) {
