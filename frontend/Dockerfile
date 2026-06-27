@@ -12,6 +12,10 @@ RUN npm ci
 # Copy the rest of the application source code
 COPY frontend/ ./
 
+# Declare build argument and env variable for Vite build
+ARG VITE_API_URL=/api/v1
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build static assets (creates dist/ folder)
 RUN npm run build
 

@@ -4,6 +4,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend-app
+    init: true
     restart: unless-stopped
     expose:
       - "5000"
@@ -13,7 +14,7 @@ services:
       - app-network
     # No ports exposed to the host system for network isolation
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/api/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:5000/api/v1/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
