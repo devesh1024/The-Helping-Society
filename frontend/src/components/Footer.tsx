@@ -36,21 +36,21 @@ export function Footer() {
           <p className="font-semibold text-sm mb-2">Quick Contact</p>
           <ul className="text-sm text-muted-foreground space-y-2 flex flex-col">
             <li className="leading-relaxed">
-              📍 The Helping Society<br />
-              <span className="pl-5 block">
+              The Helping Society<br />
+              <span className="block">
                 Ujjain Engineering College,<br />
                 Indore-Ujjain Road,<br />
                 Ujjain, MP 456010
               </span>
             </li>
             <li>
-              📞 <a href="tel:+919407097642" className="hover:text-primary transition-smooth">+91+91 94070 97642</a>
+              <a href="tel:+919407097642" className="hover:text-primary transition-smooth">+91 94070 97642</a>
             </li>
             <li>
-              💬 <a href="https://wa.me/917879453082" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-smooth">+917879453082</a>
+              <a href="https://wa.me/917879453082" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-smooth">+91 78794 53082</a>
             </li>
             <li>
-              ✉ <a href="mailto:support@thehelpingsociety.in" className="hover:text-primary transition-smooth">support@thehelpingsociety.in</a>
+              <a href="mailto:support@thehelpingsociety.in" className="hover:text-primary transition-smooth">support@thehelpingsociety.in</a>
             </li>
           </ul>
         </div>

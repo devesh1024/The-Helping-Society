@@ -157,8 +157,8 @@ export default function Community() {
                     </Badge>
                   )}
                 </div>
-                {p.metadata?.location && <p className="text-xs text-muted-foreground mt-1">📍 {p.metadata.location} · 🛏️ {p.metadata.room_type}</p>}
-                {p.metadata?.time_used && <p className="text-xs text-muted-foreground mt-1">⏳ Used: {p.metadata.time_used}</p>}
+                {p.metadata?.location && <p className="text-xs text-muted-foreground mt-1">{p.metadata.location} · {p.metadata.room_type}</p>}
+                {p.metadata?.time_used && <p className="text-xs text-muted-foreground mt-1">Used: {p.metadata.time_used}</p>}
                 <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{p.content}</p>
                 <div className="flex justify-between mt-3 text-xs text-muted-foreground">
                   <span>{formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}</span>
