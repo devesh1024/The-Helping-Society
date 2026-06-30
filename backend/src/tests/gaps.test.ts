@@ -582,5 +582,90 @@ describe('Backend Contract Gaps Resolution Tests', () => {
       const foundOpp = await Opportunity.findById(opp._id);
       expect(foundOpp).not.toBeNull();
     });
+
+    describe('Sprint 3 Support Deletion Permissions', () => {
+      let mockStudent: any;
+      let tokenStudent: string;
+
+      beforeEach(async () => {
+        mockStudent = await User.create({
+          fullName: 'Test Student',
+          email: '0701cs231011@uecu.ac.in',
+          password: 'password123',
+          role: 'student',
+          status: 'active',
+          isEmailVerified: true,
+          registrationNumber: '0701cs231011',
+          branch: 'cs',
+          yearOfRegistration: 2023,
+          dob: new Date('2003-05-15'),
+          phoneNumber: '9876543211'
+        });
+        tokenStudent = signAccessToken({ id: mockStudent._id.toString(), role: mockStudent.role, email: mockStudent.email, isCoreTeam: false });
+      });
+
+      it('should allow creator to delete their own support request', async () => {
+        const reqDoc = await SupportRequest.create({
+          title: 'Need help',
+          description: 'Need help with rent',
+          ownerId: mockStudent._id,
+          status: 'pending'
+        });
+
+        const res = await request(testApp)
+          .delete(`/api/v1/support-requests/${reqDoc._id}`)
+          .set('Authorization', `Bearer ${tokenStudent}`);
+
+        expect(res.status).toBe(200);
+        expect(await SupportRequest.findById(reqDoc._id)).toBeNull();
+      });
+
+      it('should allow admin to delete any support request', async () => {
+        const reqDoc = await SupportRequest.create({
+          title: 'Need help',
+          description: 'Need help with rent',
+          ownerId: mockStudent._id,
+          status: 'approved'
+        });
+
+        const res = await request(testApp)
+          .delete(`/api/v1/support-requests/${reqDoc._id}`)
+          .set('Authorization', `Bearer ${tokenAdminUser}`);
+
+        expect(res.status).toBe(200);
+        expect(await SupportRequest.findById(reqDoc._id)).toBeNull();
+      });
+
+      it('should prevent other users from deleting support requests', async () => {
+        const otherUser = await User.create({
+          fullName: 'Other User',
+          email: 'other@test.com',
+          password: 'password123',
+          role: 'student',
+          status: 'active',
+          isEmailVerified: true,
+          registrationNumber: '0701cs231005',
+          branch: 'cs',
+          yearOfRegistration: 2023,
+          dob: new Date('2003-05-15'),
+          phoneNumber: '9876543299'
+        });
+        const tokenOther = signAccessToken({ id: otherUser._id.toString(), role: otherUser.role, email: otherUser.email, isCoreTeam: false });
+
+        const reqDoc = await SupportRequest.create({
+          title: 'Need help',
+          description: 'Need help with rent',
+          ownerId: mockStudent._id,
+          status: 'pending'
+        });
+
+        const res = await request(testApp)
+          .delete(`/api/v1/support-requests/${reqDoc._id}`)
+          .set('Authorization', `Bearer ${tokenOther}`);
+
+        expect(res.status).toBe(403);
+        expect(await SupportRequest.findById(reqDoc._id)).not.toBeNull();
+      });
+    });
   });
 });

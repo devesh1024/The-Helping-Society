@@ -26,6 +26,7 @@ const cats = [
 interface Post {
   id: string;
   author_id: string;
+  author_name?: string;
   category: "lost_found" | "rooms" | "marketplace";
   title: string;
   content: string;
@@ -69,7 +70,8 @@ export default function Community() {
       const backendPosts = res.data.data.posts || [];
       const mapped = backendPosts.map((p: any) => ({
         id: p._id,
-        author_id: p.ownerId,
+        author_id: typeof p.ownerId === "object" && p.ownerId ? p.ownerId._id : p.ownerId,
+        author_name: typeof p.ownerId === "object" && p.ownerId ? p.ownerId.fullName : "",
         category: tab,
         title: p.title,
         content: p.description,
@@ -139,6 +141,11 @@ export default function Community() {
             {posts.map((p) => (
               <Card key={p.id} className="p-5 hover:shadow-elegant transition-smooth cursor-pointer"
                 onClick={() => isVerified ? setOpenPost(p) : toast.error("Get verified to see details")}>
+                {p.author_name && (
+                  <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+                    {p.author_name}
+                  </p>
+                )}
                 {p.images?.[0] && (
                   <img src={p.images[0]} alt="" className="rounded-lg w-full h-44 object-cover mb-3" />
                 )}
@@ -402,6 +409,17 @@ function PostDialog({ post, onClose }: { post: Post; onClose: () => void }) {
           <DialogTitle>{post.title}</DialogTitle>
           <DialogDescription className="sr-only">View post details.</DialogDescription>
         </DialogHeader>
+        {post.author_name && (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded-full bg-gradient-primary text-primary-foreground grid place-items-center text-xs font-semibold">
+              {post.author_name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-semibold">{post.author_name}</p>
+              <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
+            </div>
+          </div>
+        )}
         {(post.price != null || post.metadata?.price != null || post.metadata?.rent != null) && (
           <Badge className="bg-secondary text-secondary-foreground w-fit">
             {post.metadata?.rent ? post.metadata.rent : `₹${post.metadata?.price || post.price}`}

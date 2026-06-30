@@ -2,6 +2,7 @@ import * as supportRepository from '../repositories/supportRepository';
 import { AuditLog } from '../models/AuditLog';
 import { SupportReply } from '../models/SupportReply';
 import { User } from '../models/User';
+import { SupportRequest } from '../models/SupportRequest';
 import { createNotification } from './notificationService';
 import mongoose from 'mongoose';
 
@@ -103,6 +104,7 @@ export const getSupportRequests = async (
   }
 
   const posts = await supportRepository.findSupportRequestsPaginated(filter, skip, limit);
+  await SupportRequest.populate(posts, { path: 'ownerId', select: 'fullName' });
   const total = await supportRepository.countSupportRequests(filter);
   const totalPages = Math.ceil(total / limit);
 
@@ -128,6 +130,7 @@ export const getSupportRequestById = async (
     }
   }
 
+  await request.populate('ownerId', 'fullName');
   return request;
 };
 

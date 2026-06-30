@@ -2,6 +2,9 @@ import * as communityRepository from '../repositories/communityRepository';
 import * as commentRepository from '../repositories/commentRepository';
 import mongoose from 'mongoose';
 import { createNotification } from './notificationService';
+import { LostFoundPost } from '../models/LostFoundPost';
+import { RoomPost } from '../models/RoomPost';
+import { MarketplacePost } from '../models/MarketplacePost';
 
 // === Lost & Found ===
 export const createLostFound = async (
@@ -40,6 +43,7 @@ export const getLostFound = async (query: { page: number; limit: number; status?
   }
 
   const posts = await communityRepository.findLostFoundPaginated(filter, skip, limit);
+  await LostFoundPost.populate(posts, { path: 'ownerId', select: 'fullName' });
   const total = await communityRepository.countLostFound(filter);
   const totalPages = Math.ceil(total / limit);
 
@@ -51,6 +55,7 @@ export const getLostFoundById = async (id: string) => {
   if (!post) {
     throw new Error('Lost & Found post not found.');
   }
+  await post.populate('ownerId', 'fullName');
   return post;
 };
 
@@ -123,6 +128,7 @@ export const getRooms = async (query: { page: number; limit: number }) => {
   const skip = (page - 1) * limit;
 
   const posts = await communityRepository.findRoomPaginated({}, skip, limit);
+  await RoomPost.populate(posts, { path: 'ownerId', select: 'fullName' });
   const total = await communityRepository.countRooms({});
   const totalPages = Math.ceil(total / limit);
 
@@ -134,6 +140,7 @@ export const getRoomById = async (id: string) => {
   if (!post) {
     throw new Error('Room post not found.');
   }
+  await post.populate('ownerId', 'fullName');
   return post;
 };
 
@@ -189,6 +196,7 @@ export const getMarketplace = async (query: { page: number; limit: number }) => 
   const skip = (page - 1) * limit;
 
   const posts = await communityRepository.findMarketplacePaginated({}, skip, limit);
+  await MarketplacePost.populate(posts, { path: 'ownerId', select: 'fullName' });
   const total = await communityRepository.countMarketplace({});
   const totalPages = Math.ceil(total / limit);
 
@@ -200,6 +208,7 @@ export const getMarketplaceById = async (id: string) => {
   if (!post) {
     throw new Error('Marketplace post not found.');
   }
+  await post.populate('ownerId', 'fullName');
   return post;
 };
 

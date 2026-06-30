@@ -19,6 +19,7 @@ interface Req {
   id: string; author_id: string; subject: string; description: string;
   urgency: "standard"|"emergency"; anonymous: boolean;
   status: "pending"|"approved"|"resolved"; created_at: string;
+  author_name?: string;
 }
 interface Reply { id: string; request_id: string; author_id: string; message: string; created_at: string; }
 
@@ -29,7 +30,8 @@ const schema = z.object({
 
 const mapBackendToReq = (r: any): Req => ({
   id: r._id || r.id,
-  author_id: typeof r.ownerId === "object" ? r.ownerId?._id : r.ownerId,
+  author_id: typeof r.ownerId === "object" && r.ownerId ? r.ownerId?._id : r.ownerId,
+  author_name: typeof r.ownerId === "object" && r.ownerId ? r.ownerId?.fullName : "",
   subject: r.title,
   description: r.description,
   urgency: r.isEmergency ? "emergency" : "standard",
@@ -102,6 +104,11 @@ export default function Support() {
                   {items.filter(r => r.urgency === "emergency").map(r => (
                     <Card key={r.id} onClick={() => isVerified ? setOpenReq(r) : toast.error("Get verified to see details")}
                       className="p-5 cursor-pointer hover:shadow-elegant transition-smooth border-destructive/40 bg-destructive/5 min-w-[300px] sm:min-w-[400px] snap-start flex-shrink-0">
+                      {(!r.anonymous || isAdmin || r.author_id === user?.id) && r.author_name && (
+                        <p className="text-xs font-semibold text-destructive/80 mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+                          {r.author_name}
+                        </p>
+                      )}
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -131,6 +138,11 @@ export default function Support() {
                   {items.filter(r => r.urgency !== "emergency").map(r => (
                     <Card key={r.id} onClick={() => isVerified ? setOpenReq(r) : toast.error("Get verified to see details")}
                       className="p-5 cursor-pointer hover:shadow-elegant transition-smooth">
+                      {(!r.anonymous || isAdmin || r.author_id === user?.id) && r.author_name && (
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5 uppercase tracking-wide">
+                          {r.author_name}
+                        </p>
+                      )}
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -293,6 +305,17 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
           <DialogTitle>{showAuthor ? req.subject : "Anonymous request"}</DialogTitle>
           <DialogDescription className="sr-only">Support request details.</DialogDescription>
         </DialogHeader>
+        {showAuthor && req.author_name && (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded-full bg-gradient-primary text-primary-foreground grid place-items-center text-xs font-semibold">
+              {req.author_name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-semibold">{req.author_name}</p>
+              <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
+            </div>
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           {req.urgency==="emergency" && <Badge className="bg-destructive text-destructive-foreground"><Siren className="h-3 w-3 mr-1"/>Emergency</Badge>}
           <Badge>{req.status}</Badge>
