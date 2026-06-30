@@ -424,7 +424,7 @@ describe('Backend Contract Gaps Resolution Tests', () => {
         organizationName: 'Test Org',
         roleInOrganization: 'Developer'
       });
-      tokenUser = signAccessToken({ id: mockUser._id.toString(), role: mockUser.role, email: mockUser.email });
+      tokenUser = signAccessToken({ id: mockUser._id.toString(), role: mockUser.role, email: mockUser.email, isCoreTeam: false });
 
       mockAdmin = await User.create({
         fullName: 'Test Admin',
@@ -434,7 +434,7 @@ describe('Backend Contract Gaps Resolution Tests', () => {
         status: 'active',
         isEmailVerified: true
       });
-      tokenAdminUser = signAccessToken({ id: mockAdmin._id.toString(), role: mockAdmin.role, email: mockAdmin.email });
+      tokenAdminUser = signAccessToken({ id: mockAdmin._id.toString(), role: mockAdmin.role, email: mockAdmin.email, isCoreTeam: true });
     });
 
     it('should archive opportunity manually when deleted by owner/creator', async () => {
