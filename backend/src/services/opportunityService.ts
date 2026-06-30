@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
 import * as opportunityRepository from '../repositories/opportunityRepository';
-import { IOpportunity } from '../models/Opportunity';
+import { IOpportunity, Opportunity } from '../models/Opportunity';
 import { createNotification } from './notificationService';
 import { AuditLog } from '../models/AuditLog';
+import { OpportunityArchive } from '../models/OpportunityArchive';
 
 export const createOpportunity = async (
   createdBy: string | mongoose.Types.ObjectId,
@@ -140,9 +141,50 @@ export const updateOpportunity = async (
   return opportunity;
 };
 
-export const deleteOpportunity = async (id: string): Promise<void> => {
-  const opportunity = await opportunityRepository.deleteOpportunity(id);
-  if (!opportunity) {
+export const deleteOpportunity = async (id: string, actor?: any): Promise<void> => {
+  const opp = await Opportunity.findById(id).populate('createdBy');
+  if (!opp) {
+    throw new Error('Opportunity not found.');
+  }
+
+  // Determine deletion reason
+  let deletionReason: 'manual_user' | 'manual_admin' | 'auto_expired' = 'auto_expired';
+  if (actor) {
+    const creatorId = opp.createdBy instanceof mongoose.Types.ObjectId 
+      ? opp.createdBy.toString() 
+      : (opp.createdBy as any)?._id?.toString();
+    
+    if (actor._id?.toString() === creatorId || actor.id === creatorId) {
+      deletionReason = 'manual_user';
+    } else if (actor.role === 'admin') {
+      deletionReason = 'manual_admin';
+    } else {
+      deletionReason = 'manual_user';
+    }
+  }
+
+  const uploader = opp.createdBy as any;
+  const archiveData = {
+    originalOpportunity: opp.toObject(),
+    companyName: opp.company || 'Unknown',
+    jobTitle: opp.title,
+    opportunityType: opp.type,
+    deadline: opp.deadline,
+    description: opp.description,
+    uploadedBy: uploader?._id || opp.createdBy,
+    uploaderName: uploader?.fullName || 'Unknown',
+    uploaderRole: uploader?.role || 'Unknown',
+    uploadedAt: opp.createdAt,
+    deletedAt: new Date(),
+    deletionReason
+  };
+
+  // Archive first
+  await OpportunityArchive.create(archiveData);
+
+  // Delete from live collection afterwards
+  const deleted = await Opportunity.findByIdAndDelete(id);
+  if (!deleted) {
     throw new Error('Opportunity not found.');
   }
 };

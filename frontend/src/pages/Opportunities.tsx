@@ -86,7 +86,7 @@ export default function Opportunities() {
             </h1>
             <p className="text-muted-foreground mt-1">Curated jobs, internships and workshops, posted by Khabri admins.</p>
           </div>
-          {(isAdmin || isKhabri || user?.role === "student") && (
+          {(isAdmin || isKhabri || user?.role === "student" || user?.role === "alumni") && (
             <Button variant="hero" onClick={() => setOpen(true)}>
               <Plus className="h-4 w-4" /> {user?.role === "student" ? "Request to Upload" : "Post opportunity"}
             </Button>
@@ -187,6 +187,16 @@ function CreateDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpen
     } else {
       if (!form.company.trim()) { toast.error("Company required"); return; }
       if (!form.role.trim()) { toast.error("Role required"); return; }
+      if (form.deadline) {
+        const deadlineDate = new Date(form.deadline);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        deadlineDate.setHours(0, 0, 0, 0);
+        if (deadlineDate < today) {
+          toast.error("Deadline cannot be before today's date");
+          return;
+        }
+      }
       payload = {
         ...payload,
         title: form.role.trim(),

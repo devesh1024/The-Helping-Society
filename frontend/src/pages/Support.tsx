@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { LifeBuoy, Loader2, Lock, MessageCircle, Plus, Send, Siren } from "lucide-react";
+import { LifeBuoy, Loader2, Lock, MessageCircle, Plus, Send, Siren, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { z } from "zod";
 
@@ -230,7 +230,22 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const showAuthor = !req.anonymous || isAdmin || req.author_id === user?.id;
+
+  const handleDelete = async () => {
+    if (!confirm("Delete this support request?")) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/support-requests/${req.id}`);
+      toast.success("Deleted successfully");
+      onClose();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete support request");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const load = async () => {
     try {
@@ -283,12 +298,19 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
           <Badge>{req.status}</Badge>
         </div>
         {showAuthor && <p className="text-sm whitespace-pre-wrap">{req.description}</p>}
-        {isAdmin && req.status !== "resolved" && (
-          <div className="flex gap-2">
-            {req.status === "pending" && <Button size="sm" variant="hero" onClick={()=>setStatus("approved")}>Approve</Button>}
-            <Button size="sm" variant="outline" onClick={()=>setStatus("resolved")}>Mark resolved</Button>
-          </div>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          {isAdmin && req.status !== "resolved" && (
+            <>
+              {req.status === "pending" && <Button size="sm" variant="hero" onClick={()=>setStatus("approved")}>Approve</Button>}
+              <Button size="sm" variant="outline" onClick={()=>setStatus("resolved")}>Mark resolved</Button>
+            </>
+          )}
+          {(req.author_id === user?.id || isAdmin) && (
+            <Button size="sm" variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin"/> : <><Trash2 className="h-4 w-4 mr-1" /> Delete</>}
+            </Button>
+          )}
+        </div>
         <div className="border-t border-border pt-4 mt-2">
           <p className="font-semibold text-sm mb-2 flex items-center gap-2"><MessageCircle className="h-4 w-4"/> Replies ({replies.length})</p>
           <div className="space-y-2 max-h-60 overflow-y-auto">

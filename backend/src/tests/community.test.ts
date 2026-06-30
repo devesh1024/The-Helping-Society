@@ -220,7 +220,7 @@ describe('Community & Comments Module Tests', () => {
       expect(room).not.toBeNull();
       expect(room?.expiresAt).toBeDefined();
 
-      const expectedExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      const expectedExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
       expect(Math.abs(room!.expiresAt.getTime() - expectedExpiry)).toBeLessThan(5000);
     });
   });
@@ -279,7 +279,7 @@ describe('Community & Comments Module Tests', () => {
         location: 'West Gate St',
         contactNumber: '9876543210',
         ownerId: studentAId,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       });
       testRoomPostId = (room._id as mongoose.Types.ObjectId).toString();
     });

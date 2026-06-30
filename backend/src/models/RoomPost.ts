@@ -9,7 +9,7 @@ export interface IRoomPost extends Document {
   images: string[];
   metadata?: any;
   ownerId: mongoose.Types.ObjectId;
-  expiresAt: Date; // TTL date (7 days from creation)
+  expiresAt: Date; // TTL date (30 days from creation)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,11 +26,11 @@ const RoomPostSchema = new Schema<IRoomPost>({
   expiresAt: { 
     type: Date, 
     required: true, 
-    default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) 
+    default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
   }
 }, { timestamps: true });
 
-// TTL index to automatically delete posts after 7 days
+// TTL index to automatically delete posts after 30 days
 RoomPostSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 RoomPostSchema.index({ ownerId: 1 });
 RoomPostSchema.index({ createdAt: -1 });

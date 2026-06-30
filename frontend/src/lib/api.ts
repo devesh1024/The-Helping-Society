@@ -1,13 +1,22 @@
 import axios from "axios";
 
 let accessToken: string | null = null;
+if (typeof window !== "undefined") {
+  accessToken = localStorage.getItem("accessToken");
+}
 
 export const getAccessToken = () => accessToken;
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
+  if (token) {
+    localStorage.setItem("accessToken", token);
+  } else {
+    localStorage.removeItem("accessToken");
+  }
 };
 export const clearAccessToken = () => {
   accessToken = null;
+  localStorage.removeItem("accessToken");
 };
 
 export const api = axios.create({

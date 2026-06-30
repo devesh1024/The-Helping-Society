@@ -9,6 +9,11 @@ import { User } from '../models/User';
 import { Opportunity } from '../models/Opportunity';
 import { SupportRequest } from '../models/SupportRequest';
 import { SupportReply } from '../models/SupportReply';
+import { OpportunityArchive } from '../models/OpportunityArchive';
+import { MarketplacePost } from '../models/MarketplacePost';
+import { RoomPost } from '../models/RoomPost';
+import { LostFoundPost } from '../models/LostFoundPost';
+import { runCleanup } from '../jobs/cleanupJob';
 import opportunityRoutes from '../routes/opportunityRoutes';
 import userRoutes from '../routes/userRoutes';
 import supportRoutes from '../routes/supportRoutes';
@@ -243,6 +248,58 @@ describe('Backend Contract Gaps Resolution Tests', () => {
       const count = await Opportunity.countDocuments({});
       expect(count).toBe(0);
     });
+
+    it('should reject opportunity creation if deadline is in the past', async () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1);
+
+      const res = await request(testApp)
+        .post('/api/v1/opportunities')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({
+          title: 'Past Deadline Role',
+          description: 'Working on React Node stack.',
+          type: 'internship',
+          link: 'https://intern.com/apply',
+          deadline: pastDate.toISOString()
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toBe('Validation Failed');
+    });
+
+    it('should allow opportunity creation if deadline is today or in the future', async () => {
+      const today = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 5);
+
+      const resToday = await request(testApp)
+        .post('/api/v1/opportunities')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({
+          title: 'Today Deadline Role',
+          description: 'Working on React Node stack.',
+          type: 'internship',
+          link: 'https://intern.com/apply',
+          deadline: today.toISOString()
+        });
+
+      expect(resToday.status).toBe(201);
+
+      const resFuture = await request(testApp)
+        .post('/api/v1/opportunities')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({
+          title: 'Future Deadline Role',
+          description: 'Working on React Node stack.',
+          type: 'internship',
+          link: 'https://intern.com/apply',
+          deadline: futureDate.toISOString()
+        });
+
+      expect(resFuture.status).toBe(201);
+    });
   });
 
   // ==========================================
@@ -340,6 +397,190 @@ describe('Backend Contract Gaps Resolution Tests', () => {
         .set('Authorization', `Bearer ${tokenContributor}`);
 
       expect(getRes.status).toBe(403);
+    });
+  });
+
+  describe('Sprint 2 Auto-Delete & Archiving Tests', () => {
+    let mockUser: any;
+    let mockAdmin: any;
+    let tokenUser: string;
+    let tokenAdminUser: string;
+
+    beforeEach(async () => {
+      await Opportunity.deleteMany({});
+      await OpportunityArchive.deleteMany({});
+      await MarketplacePost.deleteMany({});
+      await RoomPost.deleteMany({});
+      await LostFoundPost.deleteMany({});
+      await SupportRequest.deleteMany({});
+
+      mockUser = await User.create({
+        fullName: 'Test Contributor',
+        email: 'contrib@test.com',
+        password: 'password123',
+        role: 'contributor',
+        status: 'active',
+        isEmailVerified: true,
+        organizationName: 'Test Org',
+        roleInOrganization: 'Developer'
+      });
+      tokenUser = signAccessToken({ id: mockUser._id.toString(), role: mockUser.role, email: mockUser.email });
+
+      mockAdmin = await User.create({
+        fullName: 'Test Admin',
+        email: 'adm@test.com',
+        password: 'password123',
+        role: 'admin',
+        status: 'active',
+        isEmailVerified: true
+      });
+      tokenAdminUser = signAccessToken({ id: mockAdmin._id.toString(), role: mockAdmin.role, email: mockAdmin.email });
+    });
+
+    it('should archive opportunity manually when deleted by owner/creator', async () => {
+      const opp = await Opportunity.create({
+        title: 'Software Dev',
+        description: 'React developer job',
+        type: 'job',
+        link: 'https://test.com/apply',
+        createdBy: mockUser._id,
+        company: 'Innovate LLC'
+      });
+
+      const res = await request(testApp)
+        .delete(`/api/v1/opportunities/${opp._id}`)
+        .set('Authorization', `Bearer ${tokenUser}`);
+
+      expect(res.status).toBe(200);
+
+      const foundOpp = await Opportunity.findById(opp._id);
+      expect(foundOpp).toBeNull();
+
+      const archives = await OpportunityArchive.find({ 'originalOpportunity._id': opp._id });
+      expect(archives.length).toBe(1);
+      expect(archives[0].deletionReason).toBe('manual_user');
+      expect(archives[0].uploaderName).toBe('Test Contributor');
+      expect(archives[0].uploaderRole).toBe('contributor');
+      expect(archives[0].companyName).toBe('Innovate LLC');
+    });
+
+    it('should archive opportunity manually when deleted by admin', async () => {
+      const opp = await Opportunity.create({
+        title: 'React Dev',
+        description: 'React developer job',
+        type: 'job',
+        link: 'https://test.com/apply',
+        createdBy: mockUser._id,
+        company: 'Innovate LLC'
+      });
+
+      const res = await request(testApp)
+        .delete(`/api/v1/opportunities/${opp._id}`)
+        .set('Authorization', `Bearer ${tokenAdminUser}`);
+
+      expect(res.status).toBe(200);
+
+      const archives = await OpportunityArchive.find({ 'originalOpportunity._id': opp._id });
+      expect(archives.length).toBe(1);
+      expect(archives[0].deletionReason).toBe('manual_admin');
+    });
+
+    it('should run cleanup job and auto-expire posts older than 30 days while archiving opportunities', async () => {
+      const freshOpp = await Opportunity.create({
+        title: 'Fresh Dev',
+        description: 'React dev job',
+        type: 'job',
+        link: 'https://test.com/apply',
+        createdBy: mockUser._id,
+        company: 'Innovate LLC'
+      });
+
+      const oldOpp = await Opportunity.create({
+        title: 'Old Dev',
+        description: 'React dev job',
+        type: 'job',
+        link: 'https://test.com/apply',
+        createdBy: mockUser._id,
+        company: 'Old LLC'
+      });
+      await Opportunity.collection.updateOne({ _id: oldOpp._id }, { $set: { createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) } });
+
+      const oldMarketplace = await MarketplacePost.create({
+        title: 'Old Marketplace',
+        description: 'Old item',
+        price: 100,
+        images: ['img1.png'],
+        contactNumber: '1234567890',
+        ownerId: mockUser._id
+      });
+      await MarketplacePost.collection.updateOne({ _id: oldMarketplace._id }, { $set: { createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) } });
+
+      const oldRoom = await RoomPost.create({
+        title: 'Old Room',
+        description: 'Old room description',
+        price: 1000,
+        location: 'West Gate',
+        contactNumber: '1234567890',
+        ownerId: mockUser._id,
+        expiresAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
+      });
+      await RoomPost.collection.updateOne({ _id: oldRoom._id }, { $set: { createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) } });
+
+      const oldLostFound = await LostFoundPost.create({
+        title: 'Old Lost Found',
+        description: 'Old lost post',
+        location: 'East Gate',
+        ownerId: mockUser._id
+      });
+      await LostFoundPost.collection.updateOne({ _id: oldLostFound._id }, { $set: { createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) } });
+
+      const oldSupport = await SupportRequest.create({
+        title: 'Old Support',
+        description: 'Old support request description',
+        ownerId: mockUser._id
+      });
+      await SupportRequest.collection.updateOne({ _id: oldSupport._id }, { $set: { createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) } });
+
+      await runCleanup();
+
+      expect(await Opportunity.findById(oldOpp._id)).toBeNull();
+      expect(await MarketplacePost.findById(oldMarketplace._id)).toBeNull();
+      expect(await RoomPost.findById(oldRoom._id)).toBeNull();
+      expect(await LostFoundPost.findById(oldLostFound._id)).toBeNull();
+      expect(await SupportRequest.findById(oldSupport._id)).toBeNull();
+
+      expect(await Opportunity.findById(freshOpp._id)).not.toBeNull();
+
+      const archives = await OpportunityArchive.find({ 'originalOpportunity._id': oldOpp._id });
+      expect(archives.length).toBe(1);
+      expect(archives[0].deletionReason).toBe('auto_expired');
+    });
+
+    it('should not delete live opportunity if archiving fails', async () => {
+      const opp = await Opportunity.create({
+        title: 'Fail Dev',
+        description: 'React dev job',
+        type: 'job',
+        link: 'https://test.com/apply',
+        createdBy: mockUser._id,
+        company: 'Innovate LLC'
+      });
+
+      const originalCreate = OpportunityArchive.create;
+      OpportunityArchive.create = async () => {
+        throw new Error('Database constraint violation or network failure');
+      };
+
+      try {
+        await request(testApp)
+          .delete(`/api/v1/opportunities/${opp._id}`)
+          .set('Authorization', `Bearer ${tokenUser}`);
+      } catch (err) {}
+
+      OpportunityArchive.create = originalCreate;
+
+      const foundOpp = await Opportunity.findById(opp._id);
+      expect(foundOpp).not.toBeNull();
     });
   });
 });

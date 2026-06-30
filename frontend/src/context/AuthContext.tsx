@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { api, setAccessToken, clearAccessToken } from "@/lib/api";
+import { api, setAccessToken, clearAccessToken, getAccessToken } from "@/lib/api";
 
 export type AppRole = "super_admin" | "admin" | "user";
 export type AdminType = "khabri" | "professor" | null;
@@ -162,10 +162,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const response = await api.post("/auth/refresh-token");
-        const { accessToken } = response.data.data;
-        setAccessToken(accessToken);
-        await loadProfile();
+        const existingToken = getAccessToken();
+        if (existingToken) {
+          await loadProfile();
+        } else {
+          const response = await api.post("/auth/refresh-token");
+          const { accessToken } = response.data.data;
+          setAccessToken(accessToken);
+          await loadProfile();
+        }
       } catch (err) {
         clearAccessToken();
         setUser(null);

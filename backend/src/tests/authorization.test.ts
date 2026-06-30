@@ -139,7 +139,7 @@ describe('Authorization & BOLA Middleware Tests', () => {
       location: 'Campus West Gate',
       contactNumber: '1234567890',
       ownerId: studentAId,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     });
     testRoomPostId = (roomPost._id as mongoose.Types.ObjectId).toString();
   });

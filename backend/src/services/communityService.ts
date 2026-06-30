@@ -98,8 +98,8 @@ export const createRoom = async (
   const post = await communityRepository.createRoom({
     ...data,
     ownerId,
-    // Room listings automatically expire and self-delete after 7 days
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    // Room listings automatically expire and self-delete after 30 days
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   });
 
   try {

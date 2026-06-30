@@ -111,7 +111,7 @@ export const updateOpportunity = async (req: Request, res: Response, next: NextF
 
 export const deleteOpportunity = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await opportunityService.deleteOpportunity(req.params.id);
+    await opportunityService.deleteOpportunity(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       message: 'Opportunity deleted successfully.'

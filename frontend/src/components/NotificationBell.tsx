@@ -48,7 +48,7 @@ export function NotificationBell() {
     if (!user) return;
     const interval = setInterval(() => {
       load();
-    }, 10000);
+    }, 30000);
     return () => {
       clearInterval(interval);
     };

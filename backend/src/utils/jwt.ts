@@ -12,7 +12,7 @@ export const signAccessToken = (payload: IJWTPayload): string => {
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is not defined.');
   }
-  return jwt.sign(payload, secret, { expiresIn: '15m' });
+  return jwt.sign(payload, secret, { expiresIn: '60m' });
 };
 
 export const signRefreshToken = (payload: IJWTPayload): string => {
