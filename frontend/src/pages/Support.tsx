@@ -114,14 +114,12 @@ export default function Support() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge className="bg-destructive text-destructive-foreground"><Siren className="h-3 w-3 mr-1"/> Emergency</Badge>
                             <Badge variant={r.status === "resolved" ? "secondary" : r.status === "approved" ? "default" : "outline"}>{r.status}</Badge>
-                            {r.anonymous && (isAdmin || r.author_id === user?.id) && <Badge variant="outline">Anonymous</Badge>}
+                            {r.anonymous && <Badge variant="outline">Anonymous</Badge>}
                           </div>
                           <h3 className="font-display font-semibold text-lg mt-2 line-clamp-1">
-                            {r.anonymous && !isAdmin && r.author_id !== user?.id ? "Anonymous request" : r.subject}
+                            {r.subject}
                           </h3>
-                          {!(r.anonymous && !isAdmin && r.author_id !== user?.id) && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{r.description}</p>
-                          )}
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{r.description}</p>
                         </div>
                         <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</span>
                       </div>
@@ -147,14 +145,12 @@ export default function Support() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant={r.status === "resolved" ? "secondary" : r.status === "approved" ? "default" : "outline"}>{r.status}</Badge>
-                            {r.anonymous && (isAdmin || r.author_id === user?.id) && <Badge variant="outline">Anonymous</Badge>}
+                            {r.anonymous && <Badge variant="outline">Anonymous</Badge>}
                           </div>
                           <h3 className="font-display font-semibold text-lg mt-2">
-                            {r.anonymous && !isAdmin && r.author_id !== user?.id ? "Anonymous request" : r.subject}
+                            {r.subject}
                           </h3>
-                          {!(r.anonymous && !isAdmin && r.author_id !== user?.id) && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{r.description}</p>
-                          )}
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{r.description}</p>
                         </div>
                         <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</span>
                       </div>
@@ -302,10 +298,20 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
     <Dialog open onOpenChange={(o)=>!o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{showAuthor ? req.subject : "Anonymous request"}</DialogTitle>
+          <DialogTitle>{req.subject}</DialogTitle>
           <DialogDescription className="sr-only">Support request details.</DialogDescription>
         </DialogHeader>
-        {showAuthor && req.author_name && (
+        {!showAuthor ? (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded-full bg-muted text-muted-foreground grid place-items-center text-xs font-semibold">
+              A
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">Anonymous</p>
+              <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</p>
+            </div>
+          </div>
+        ) : req.author_name && (
           <div className="flex items-center gap-2 mb-2">
             <div className="h-8 w-8 rounded-full bg-gradient-primary text-primary-foreground grid place-items-center text-xs font-semibold">
               {req.author_name.charAt(0).toUpperCase()}
@@ -320,7 +326,7 @@ function ReqDialog({ req, onClose }: { req: Req; onClose: ()=>void }) {
           {req.urgency==="emergency" && <Badge className="bg-destructive text-destructive-foreground"><Siren className="h-3 w-3 mr-1"/>Emergency</Badge>}
           <Badge>{req.status}</Badge>
         </div>
-        {showAuthor && <p className="text-sm whitespace-pre-wrap">{req.description}</p>}
+        <p className="text-sm whitespace-pre-wrap">{req.description}</p>
         <div className="flex gap-2 flex-wrap">
           {isAdmin && req.status !== "resolved" && (
             <>

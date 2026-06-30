@@ -400,6 +400,94 @@ describe('Backend Contract Gaps Resolution Tests', () => {
     });
   });
 
+  describe('Anonymous Support Requests API', () => {
+    let anonymousReq: any;
+    let peerStudentId: mongoose.Types.ObjectId;
+    let tokenPeerStudent: string;
+
+    beforeEach(async () => {
+      const peerStudent = await User.create({
+        fullName: 'Peer Student',
+        email: '0701cs231002@uecu.ac.in',
+        password: 'password123',
+        role: 'student',
+        status: 'active',
+        isEmailVerified: true,
+        registrationNumber: '0701cs231002',
+        branch: 'cs',
+        yearOfRegistration: 2023,
+        dob: new Date('2003-05-15'),
+        phoneNumber: '9876543201'
+      });
+      peerStudentId = peerStudent._id as mongoose.Types.ObjectId;
+      tokenPeerStudent = signAccessToken({ id: peerStudentId.toString(), role: 'student', email: peerStudent.email, isCoreTeam: false });
+
+      anonymousReq = await SupportRequest.create({
+        title: 'Anonymous helper needed',
+        description: 'Need confidential food supplies.',
+        contactNumber: '1112223333',
+        location: 'Hostel 4',
+        isEmergency: true,
+        anonymous: true,
+        status: 'approved',
+        ownerId: studentId
+      });
+    });
+
+    it('should sanitize creator details for other users but keep them for creator and admin', async () => {
+      // 1. Peer student gets the request
+      const peerRes = await request(testApp)
+        .get(`/api/v1/support-requests/${anonymousReq._id}`)
+        .set('Authorization', `Bearer ${tokenPeerStudent}`);
+
+      expect(peerRes.status).toBe(200);
+      expect(peerRes.body.data.request.ownerId._id).toBe('anonymous');
+      expect(peerRes.body.data.request.ownerId.fullName).toBe('Anonymous');
+      expect(peerRes.body.data.request.contactNumber).toBeUndefined();
+      expect(peerRes.body.data.request.location).toBeUndefined();
+
+      // 2. Creator gets the request
+      const creatorRes = await request(testApp)
+        .get(`/api/v1/support-requests/${anonymousReq._id}`)
+        .set('Authorization', `Bearer ${tokenStudent}`);
+
+      expect(creatorRes.status).toBe(200);
+      expect(creatorRes.body.data.request.ownerId._id).toBe(studentId.toString());
+      expect(creatorRes.body.data.request.ownerId.fullName).toBe('Test Student');
+
+      // 3. Admin gets the request
+      const adminRes = await request(testApp)
+        .get(`/api/v1/support-requests/${anonymousReq._id}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`);
+
+      expect(adminRes.status).toBe(200);
+      expect(adminRes.body.data.request.ownerId._id).toBe(studentId.toString());
+    });
+
+    it('should allow creator and admin to reply but deny others', async () => {
+      // 1. Creator replies
+      const creatorReply = await request(testApp)
+        .post(`/api/v1/support-requests/${anonymousReq._id}/replies`)
+        .set('Authorization', `Bearer ${tokenStudent}`)
+        .send({ message: 'Creator reply' });
+      expect(creatorReply.status).toBe(201);
+
+      // 2. Admin replies
+      const adminReply = await request(testApp)
+        .post(`/api/v1/support-requests/${anonymousReq._id}/replies`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ message: 'Admin reply' });
+      expect(adminReply.status).toBe(201);
+
+      // 3. Peer replies (should be forbidden)
+      const peerReply = await request(testApp)
+        .post(`/api/v1/support-requests/${anonymousReq._id}/replies`)
+        .set('Authorization', `Bearer ${tokenPeerStudent}`)
+        .send({ message: 'Peer reply' });
+      expect(peerReply.status).toBe(403);
+    });
+  });
+
   describe('Sprint 2 Auto-Delete & Archiving Tests', () => {
     let mockUser: any;
     let mockAdmin: any;

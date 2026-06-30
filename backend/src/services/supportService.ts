@@ -6,6 +6,28 @@ import { SupportRequest } from '../models/SupportRequest';
 import { createNotification } from './notificationService';
 import mongoose from 'mongoose';
 
+const sanitizeSupportRequest = (
+  request: any,
+  userId: string | mongoose.Types.ObjectId,
+  role: string
+) => {
+  const reqObj = request.toObject ? request.toObject() : request;
+  if (
+    reqObj.anonymous &&
+    role !== 'admin' &&
+    reqObj.ownerId?._id?.toString() !== userId.toString() &&
+    reqObj.ownerId?.toString() !== userId.toString()
+  ) {
+    reqObj.ownerId = {
+      _id: 'anonymous',
+      fullName: 'Anonymous'
+    };
+    reqObj.contactNumber = undefined;
+    reqObj.location = undefined;
+  }
+  return reqObj;
+};
+
 export const createSupportRequest = async (
   ownerId: string | mongoose.Types.ObjectId,
   data: {
@@ -105,10 +127,13 @@ export const getSupportRequests = async (
 
   const posts = await supportRepository.findSupportRequestsPaginated(filter, skip, limit);
   await SupportRequest.populate(posts, { path: 'ownerId', select: 'fullName' });
+  
+  const sanitizedPosts = posts.map(post => sanitizeSupportRequest(post, userId, role));
+
   const total = await supportRepository.countSupportRequests(filter);
   const totalPages = Math.ceil(total / limit);
 
-  return { posts, total, page, limit, totalPages };
+  return { posts: sanitizedPosts, total, page, limit, totalPages };
 };
 
 export const getSupportRequestById = async (
@@ -131,7 +156,7 @@ export const getSupportRequestById = async (
   }
 
   await request.populate('ownerId', 'fullName');
-  return request;
+  return sanitizeSupportRequest(request, userId, role);
 };
 
 export const updateSupportRequest = async (
