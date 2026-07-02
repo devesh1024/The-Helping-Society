@@ -16,6 +16,7 @@ import Support from "./pages/Support.tsx";
 import Admin from "./pages/Admin.tsx";
 import Legal from "./pages/Legal.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import VerifyEmail from "./pages/VerifyEmail.tsx";   // ← add this line
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/verify-email" element={<VerifyEmail />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
             <Route path="/opportunities" element={<ProtectedRoute><Opportunities /></ProtectedRoute>} />
